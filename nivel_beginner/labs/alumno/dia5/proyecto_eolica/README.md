@@ -13,7 +13,7 @@ proyecto_eolica/
 
 ## 1 · Tu repositorio en GitHub
 
-**Con la plantilla (lo normal).** Abre el enlace que te pasa el formador, pulsa **Use this template → Create a new repository**, ponle de nombre `proyecto-eolica`, déjalo privado y créalo.
+**Con la plantilla (lo normal).** Abre https://github.com/JCamposMinsait/proyecto-eolica-plantilla, pulsa **Use this template → Create a new repository**, ponle de nombre `proyecto-eolica`, déjalo privado y créalo.
 
 **A mano, si no hay plantilla.**
 1. En GitHub, **New repository**: `proyecto-eolica`, privado y sin README.
