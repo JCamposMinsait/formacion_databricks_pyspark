@@ -1,18 +1,11 @@
 # Databricks notebook source
-# MAGIC %md
-# MAGIC # Limpieza de las demos del formador
-# MAGIC
-# MAGIC Borra todo lo que crean los notebooks de demos: tablas, vistas, funciones y carpetas del Volume que empiezan por `demo_` o `_demo_`. **No toca nada de los labs.**
-# MAGIC
-# MAGIC Se usa de dos formas:
-# MAGIC - Cada notebook de demos la llama en su primera celda con su día (`%run ./00_limpieza_demos $dia="1"`). Así puedes ensayar y repetir las demos tantas veces como quieras y siempre parten de cero.
-# MAGIC - Suelta, con el desplegable de arriba en **todos**, para dejar el esquema limpio al terminar el curso.
-
-# COMMAND ----------
-
 # MAGIC %run ../labs/00_setup/00_config
 
 # COMMAND ----------
+
+# Borra lo que crean las demos (objetos y rutas que empiezan por demo_ o _demo_). No toca las tablas de los labs.
+# Cada demo lo llama al principio con su día: %run ./00_limpieza_demos $dia="1"
+# Ejecutado directamente con dia = todos deja el esquema limpio al acabar.
 
 dbutils.widgets.dropdown("dia", "todos", ["1", "2", "3", "4", "5", "todos"], "Día a limpiar")
 DIA = dbutils.widgets.get("dia")

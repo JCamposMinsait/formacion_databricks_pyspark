@@ -22,7 +22,7 @@ labs/
 ├─ 00_setup/reiniciar_lab.py    ← borra lo que crea el lab de un día, para repetirlo desde cero
 ├─ 00_setup/ponerse_al_dia.py   ← crea las tablas de los días anteriores a quien se haya perdido uno
 ├─ alumno/                 ← guías para los alumnos: pasos, slide de referencia, pistas y huecos (___ / # TODO)
-└─ soluciones/             ← los mismos labs resueltos, para el formador
+└─ soluciones/             ← los mismos labs resueltos
 ```
 
 - Los alumnos trabajan en `alumno/`. Cada paso indica la slide del curso donde está explicado (por ejemplo, "Día 1 · Time travel: cada commit es una versión").

@@ -1,25 +1,13 @@
 # Databricks notebook source
-# MAGIC %md
-# MAGIC # 00 · Configuración común del curso
-# MAGIC
-# MAGIC Este notebook **no se ejecuta solo**: lo llaman todos los labs con `%run ../00_setup/00_config`.
-# MAGIC
-# MAGIC Define:
-# MAGIC - Catálogo / esquema / volumen de cada alumno (cada uno trabaja en su esquema, así no nos pisamos).
-# MAGIC - Rutas de landing.
-# MAGIC - Los maestros del caso de uso: **parques eólicos y aerogeneradores** (los mismos todos los días).
-# MAGIC
-# MAGIC > Si no tenéis permiso para `CREATE CATALOG`, cambiad `CATALOGO` por uno que ya exista y listo.
-
-# COMMAND ----------
+# Configuración común. Se carga con %run desde los labs y las demos.
+# Crea (si no existen) el catálogo, el esquema de cada usuario y el volumen,
+# y define las rutas y los maestros de parques y aerogeneradores.
 
 import re
 from pyspark.sql import functions as F, types as T
 
-# ---------- EDITAR SI HACE FALTA ----------
-CATALOGO = "formacion"          # catálogo compartido del curso
+CATALOGO = "formacion"          # si no se puede crear, se usa el catálogo por defecto de la cuenta
 VOLUMEN  = "landing"            # volumen para ficheros crudos
-# ------------------------------------------
 
 _usuario = spark.sql("SELECT current_user()").first()[0]
 ALUMNO   = re.sub(r"[^a-z0-9]", "_", _usuario.split("@")[0].lower())
@@ -54,12 +42,7 @@ def t(nombre: str) -> str:
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Maestros del caso de uso
-# MAGIC
-# MAGIC 6 parques, 240 aerogeneradores. **Ojo: el parque P01 tiene el 60 % de las máquinas** → lo usamos el día 2 para provocar *data skew*.
-
-# COMMAND ----------
+# Maestros: 6 parques y 240 aerogeneradores. P01 tiene el 60 % de las máquinas (se usa en el día 2 para ver data skew).
 
 PARQUES = [
     # park_id, nombre, provincia, lat, lon, operador
