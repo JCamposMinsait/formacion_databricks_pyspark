@@ -1,0 +1,15 @@
+resources:
+  pipelines:
+    telemetria_pipeline:
+      name: telemetria-eolica-pipeline
+      catalog: ${var.catalogo}
+      schema: ${var.esquema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      libraries:
+        - file:
+            path: ../src/pipeline/telemetria_pipeline.py
+      configuration:
+        ruta_landing: ${var.ruta_landing}
+        tabla_maestro: ${var.catalogo}.${var.esquema}.maestro_turbinas_snapshot

@@ -1,0 +1,59 @@
+# =====================================================================
+# Declarative Automation Bundle (antes "Databricks Asset Bundles")
+# Telemetría eólica: pipeline declarativo + job orquestador
+#
+#   databricks bundle validate -t dev
+#   databricks bundle deploy   -t dev
+#   databricks bundle run      telemetria_job -t dev
+#   databricks bundle deploy   -t prod      ← lo hace la CI con el Service Principal
+# =====================================================================
+bundle:
+  name: telemetria_eolica
+
+include:
+  - resources/*.yml
+
+variables:
+  catalogo:
+    description: Catálogo de destino
+  esquema:
+    description: Esquema de destino
+    default: eolica
+  ruta_landing:
+    description: Carpeta de la que lee el pipeline y que vigila el disparador del job
+  grupo_lectores:
+    description: Grupo con permiso de lectura sobre lo desplegado
+    default: analistas_energia
+  email_alertas:
+    description: A quién avisar si falla el job
+    default: datos@empresa.com
+
+targets:
+  # ---------- DEV: cada desarrollador despliega SU copia (prefijo [dev usuario], schedules en pausa)
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-XXXXXXXX-XXXX.cloud.databricks.com   # la URL de vuestro workspace de Free Edition
+    variables:
+      catalogo: formacion   # si 00_config no pudo crear formacion, el catálogo que use (normalmente workspace)
+      # Esquema propio del bundle: en el vuestro ya hay bronze_telemetria y silver_telemetria de los labs
+      esquema: eolica_${workspace.current_user.short_name}_bundle
+      # Lee del mismo landing en el que escribe el simulador del lab 4a (si vuestro catálogo no es formacion, cambiadlo también aquí)
+      ruta_landing: /Volumes/formacion/eolica_${workspace.current_user.short_name}/landing/telemetria_stream
+
+  # ---------- PROD: despliega la CI con un Service Principal, nunca una persona
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-YYYYYYYY-YYYY.cloud.databricks.com   # el workspace de producción
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalogo: energia_prod
+      esquema: eolica
+      ruta_landing: /Volumes/energia_prod/eolica/landing/telemetria_stream
+    run_as:
+      service_principal_name: "00000000-0000-0000-0000-000000000000"   # applicationId del SP
+    permissions:
+      - group_name: ${var.grupo_lectores}
+        level: CAN_VIEW
