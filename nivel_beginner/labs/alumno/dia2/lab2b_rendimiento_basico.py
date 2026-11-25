@@ -8,7 +8,7 @@
 # MAGIC
 # MAGIC > En la cuenta gratuita no hay Spark UI. Lo vemos con `explain`, contando filas por partición y con el Query Profile (**See performance** debajo de cada resultado).
 # MAGIC
-# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. En la última escribes tú el código entero. Los retos del final son opcionales y van de menos a más.
 
 # COMMAND ----------
 
@@ -130,21 +130,23 @@ print(f"Con UDF: {time.time() - t0:.1f} s")
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Escribe lo mismo con `F.when` y mide el tiempo.
+# MAGIC Escribe lo mismo con `F.when` y mide el tiempo. Esta vez escribes tú la celda entera, siguiendo la de la UDF.
 # MAGIC
 # MAGIC Sale el mismo recuento y normalmente tarda menos que la UDF.
 
 # COMMAND ----------
 
-t0 = time.time()
-zona = F.when(F.col("value") < ___, "CALMA").when(F.col("value") >= ___, "CORTE").otherwise(___)
-viento.select(zona.alias("zona")).groupBy("zona").count().collect()
-print(f"Con funciones de Spark: {time.time() - t0:.1f} s")
+# Guarda la hora en t0, crea la columna zona con F.when sobre viento, agrupa y cuenta con collect() y escribe lo que ha tardado
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Arregla el skew con *salting*: añade una columna `sal` aleatoria de 0 a 7 y reparte por `park_id` y `sal`.
-# MAGIC 2. Haz la suma de potencia por parque en dos fases con la sal: primero por `park_id` y `sal`, después solo por `park_id`. Comprueba que da lo mismo.
-# MAGIC 3. Escribe una Pandas UDF para la zona de viento y compárala en tiempo con la UDF normal.
+# MAGIC Van de menos a más. El último es para quien vaya sobrado.
+# MAGIC
+# MAGIC 1. ¿En cuántas particiones llega la Bronze tal cual la lees y cuántas filas trae cada una? Usa `filas_por_particion` sin repartir antes.
+# MAGIC 2. Arregla el skew con *salting*: añade una columna `sal` aleatoria de 0 a 7 y reparte por `park_id` y `sal`.
+# MAGIC 3. Haz la suma de potencia por parque en dos fases con la sal, primero por `park_id` y `sal` y después solo por `park_id`. Comprueba que da lo mismo.
+# MAGIC 4. Escribe una Pandas UDF para la zona de viento y compárala en tiempo con la UDF normal. Se declara con `@pandas_udf("string")` y recibe una `pd.Series` entera en lugar de un valor suelto.
+# MAGIC 5. Escribe una función `resumen_particiones(df)` que devuelva en una fila el número de particiones con datos, las filas de la mayor, las de la menor y cuántas veces es mayor una que otra. Úsala para comparar el reparto por parque, el reparto por parque y sal y el `coalesce(2)`.

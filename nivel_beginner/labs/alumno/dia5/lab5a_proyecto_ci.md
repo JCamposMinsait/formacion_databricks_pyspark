@@ -19,6 +19,10 @@ Crea la rama `mi-cambio` (apartado 3 del README) y en ella:
 3. Cuando esté en verde, haz el merge.
 
 ## 4 · Retos
-- Rompe a propósito un test (por ejemplo, espera 5 en vez de 4.5), haz commit y mira cómo la CI se pone en rojo en la PR. Después arréglalo.
-- Activa la CD (apartado 4 del README), haz un merge a `main` y ejecuta en Databricks el job que se despliega.
-- Añade una función `quitar_negativos` que ponga a cero las potencias negativas, con su test.
+Van de menos a más. El último es para quien vaya sobrado.
+
+1. Rompe a propósito un test (por ejemplo, espera 5 en vez de 4.5), haz commit y mira cómo la CI se pone en rojo en la PR. Después arréglalo.
+2. Añade una función `quitar_negativos` que ponga a cero las potencias negativas, con su test.
+3. Añade otro test a `limpiar_lecturas` que compruebe que no quita dos lecturas de la misma turbina en instantes distintos y que un valor nulo sigue siendo nulo.
+4. Activa la CD (apartado 4 del README), haz un merge a `main` y ejecuta en Databricks el job que se despliega.
+5. Añade al job de `databricks.yml` una segunda tarea, `resumen`, con un notebook nuevo que use tus funciones y guarde en una tabla la potencia media de cada turbina en MW. Tiene que ejecutarse después de `usar_modulo` (`depends_on`). Despliégalo con la CD y ejecuta el job.

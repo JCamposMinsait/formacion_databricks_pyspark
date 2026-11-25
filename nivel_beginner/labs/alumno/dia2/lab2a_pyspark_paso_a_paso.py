@@ -16,7 +16,7 @@
 # MAGIC | `ORDER BY a DESC` | `df.orderBy(F.desc("a"))` |
 # MAGIC | `JOIN b USING (id)` | `df.join(b, "id")` |
 # MAGIC
-# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
+# MAGIC En las primeras celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Desde la sección 5 escribes tú el código entero. Los retos del final son opcionales y van de menos a más.
 
 # COMMAND ----------
 
@@ -142,12 +142,14 @@ display(limpio.filter(F.col("signal") == "power_kw").groupBy("park_id")
 # MAGIC ### Ahora tú
 # MAGIC La temperatura máxima de la multiplicadora de cada turbina, de más a menos. Quédate con las 5 primeras.
 # MAGIC
+# MAGIC A partir de aquí la celda viene vacía y escribes tú la consulta entera, siguiendo el ejemplo de arriba.
+# MAGIC
 # MAGIC Arriba deberían salir WTG-0013 y WTG-0187.
 
 # COMMAND ----------
 
-display(limpio.filter(F.col("signal") == "temp_gearbox_c").groupBy(___)
-        .agg(F.max(___).alias("temp_max")).orderBy(F.desc(___)).limit(5))
+# Filtra la señal temp_gearbox_c, agrupa por turbina, saca el máximo, ordena de más a menos y quédate con 5
+
 
 # COMMAND ----------
 
@@ -166,15 +168,14 @@ display(limpio.filter(F.col("signal") == "power_kw")
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC La potencia media por modelo de turbina.
+# MAGIC La potencia media por modelo de turbina, de más a menos.
 # MAGIC
 # MAGIC Salen los tres modelos, y no tiene por qué ganar el de más potencia nominal.
 
 # COMMAND ----------
 
-display(limpio.filter(F.col("signal") == "power_kw")
-        .join(maestro.select("turbine_id", ___), "turbine_id")
-        .groupBy(___).agg(F.round(F.avg("value"), 1).alias("kw_medio")))
+# Filtra power_kw, une con el maestro (turbine_id y modelo), agrupa por modelo, saca la media y ordena
+
 
 # COMMAND ----------
 
@@ -203,17 +204,16 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- TODO: temperatura máxima de la multiplicadora por parque
-# MAGIC SELECT park_id, max(value) AS temp_max
-# MAGIC FROM ___
-# MAGIC WHERE signal = ___
-# MAGIC GROUP BY park_id
-# MAGIC ORDER BY temp_max DESC
+# MAGIC -- Temperatura máxima de la multiplicadora por parque, de más a menos, sobre lecturas_v
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Las 5 turbinas con más horas de viento por encima de 12 m/s (cuenta minutos y divide entre 60).
+# MAGIC Van de menos a más. El último es para quien vaya sobrado.
+# MAGIC
+# MAGIC 1. Las 5 turbinas con más horas de viento por encima de 12 m/s. Cada lectura es un minuto, así que cuenta y divide entre 60.
 # MAGIC 2. Las lecturas de turbinas que no están en el maestro, con un `left_anti`.
-# MAGIC 3. La potencia media por hora del día de todo el parque P03. ¿A qué hora sopla más?
+# MAGIC 3. El viento medio por hora del día en el parque P03. ¿A qué hora sopla más? La hora se saca con `F.hour("ts")`.
+# MAGIC 4. Un resumen por provincia con la energía producida en MWh, el número de turbinas y la temperatura máxima de la multiplicadora, todo en un solo `agg`. Para quedarte con una señal dentro de una agregación, mete un `F.when` dentro, por ejemplo `F.max(F.when(F.col("signal") == "temp_gearbox_c", F.col("value")))`. La energía es la suma de `power_kw` entre 60, porque cada lectura es un minuto, y entre 1000 para pasar de kWh a MWh.
+# MAGIC 5. ¿Qué turbinas rinden peor que las demás de su modelo? Pasa a una fila por turbina y minuto con una columna por señal con `groupBy("turbine_id", "ts").pivot("signal", ["wind_speed", "power_kw"]).agg(F.avg("value"))`. Quédate con los minutos de viento entre 4 y 8 m/s y divide la potencia entre el viento al cubo, que es como crece la potencia con el viento. Saca la media de cada turbina, compárala con la media de su modelo y ordena. Las que menos rinden deberían ser WTG-0042, WTG-0117 y WTG-0199.

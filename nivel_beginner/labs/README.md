@@ -1,7 +1,7 @@
 # Labs del curso Databricks y PySpark
 
 Cada lab tiene dos versiones:
-- `alumno/`: los labs paso a paso. El código de los pasos difíciles ya viene escrito y explicado. En los ejercicios **Ahora tú** los alumnos completan los `___`. Al final de cada lab hay unos retos opcionales.
+- `alumno/`: los labs paso a paso. El código de los pasos difíciles ya viene escrito y explicado. En los ejercicios **Ahora tú** los alumnos completan los `___`. Desde el día 2, en la segunda mitad de cada lab escriben ellos el código entero. Al final de cada lab hay unos retos opcionales que van de menos a más, y el último es para quien vaya sobrado.
 - `soluciones/`: lo mismo, con los ejercicios y los retos resueltos. No se reparte a los alumnos.
 
 ## Orden

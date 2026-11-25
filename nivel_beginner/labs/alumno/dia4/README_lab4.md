@@ -19,7 +19,12 @@ Necesitas el simulador en marcha y la tabla `silver_dim_turbina` del lab 3. Si n
 3. Vuelve a lanzarlo con el simulador en marcha: solo se procesa lo nuevo.
 
 ## 3 · Retos
-- Pasa el pipeline a modo **Continuous** un par de minutos y vuelve a Triggered. En la cuenta gratuita el modo continuo gasta cuota.
-- Mira qué hace **Full refresh** antes de pulsarlo. Recalcula todo desde cero.
+Van de menos a más. El último es para quien vaya sobrado.
+
+1. Mira qué hace **Full refresh** antes de pulsarlo. Recalcula todo desde cero.
+2. Pasa el pipeline a modo **Continuous** un par de minutos y vuelve a Triggered. En la cuenta gratuita el modo continuo gasta cuota.
+3. En un notebook, saca del `event_log` de `silver_telemetria` cuántas filas han pasado y cuántas se han descartado con cada regla, como en la demo. ¿Por qué no se descarta casi nada?
+4. Haz una copia de `lab4c_pipeline.py`, apunta el pipeline a la copia y añade a la Silver una regla que solo avise cuando el viento pase de 30 m/s. Búscala después en la pestaña de calidad.
+5. En la copia, añade una vista materializada `gold_alertas_temperatura` con la temperatura máxima de la multiplicadora de cada turbina, quedándote con las que pasan de 75 ºC. Se declara con `@dp.materialized_view`, como la Gold que ya hay. Debería salir WTG-0013.
 
 > En la cuenta gratuita solo puede haber un pipeline activo a la vez. Al terminar, déjalo parado.

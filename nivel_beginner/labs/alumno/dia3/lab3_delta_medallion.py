@@ -8,7 +8,7 @@
 # MAGIC
 # MAGIC > Hay que terminar al menos las tablas Gold, porque el jueves y el viernes trabajamos sobre ellas. Si te falta la Bronze, ejecuta antes `00_setup/ponerse_al_dia` eligiendo el día 3.
 # MAGIC
-# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
+# MAGIC En las primeras celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Desde la sección 5 escribes tú más código. Los retos del final son opcionales y van de menos a más.
 
 # COMMAND ----------
 
@@ -154,13 +154,14 @@ print("silver_telemetria:", spark.table(t("silver_telemetria")).count(), "filas"
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Cuenta las lecturas en cuarentena por turbina.
+# MAGIC Cuenta las lecturas en cuarentena por turbina. Desde aquí escribes tú la celda entera.
 # MAGIC
 # MAGIC Deberían salir WTG-0901 y WTG-0902, las dos turbinas que no existen en el maestro.
 
 # COMMAND ----------
 
-display(spark.table(t(___)).groupBy("turbine_id").count())
+# Lee silver_cuarentena, agrupa por turbina y cuenta
+
 
 # COMMAND ----------
 
@@ -256,18 +257,23 @@ for col, txt in [("factor_capacidad", "Energía real / energía máxima a potenc
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Pon un comentario a la columna `energia_mwh` de `gold_kpi_parque_dia` y míralo en Catalog Explorer.
+# MAGIC Pon un comentario a la columna `energia_mwh` de `gold_kpi_parque_dia` y míralo en Catalog Explorer. Escribe tú la sentencia, siguiendo el bucle de arriba.
 # MAGIC
 # MAGIC En la pestaña Overview de la tabla, en Catalog Explorer, la columna debería tener tu comentario.
 
 # COMMAND ----------
 
-spark.sql(f"ALTER TABLE {t('gold_kpi_parque_dia')} ALTER COLUMN ___ COMMENT ___")
+# ALTER TABLE ... ALTER COLUMN ... COMMENT '...'
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Con `LAG`, calcula para cada lectura los minutos desde la anterior de la misma turbina y cuenta los huecos de más de 5 minutos por parque.
-# MAGIC 2. Guarda la historia del maestro como SCD tipo 2 en `dim_turbina_scd2`, con `valido_desde`, `valido_hasta` y `es_actual`, usando un MERGE.
-# MAGIC 3. Las 10 turbinas con peor rendimiento medio y vibración por encima del percentil 90.
+# MAGIC Van de menos a más. El último es para quien vaya sobrado.
+# MAGIC
+# MAGIC 1. Las 5 turbinas con peor disponibilidad media en `gold_kpi_turbina_dia`, con su parque y su modelo.
+# MAGIC 2. Con `DESCRIBE HISTORY`, busca la versión de `silver_dim_turbina` de justo antes del MERGE y cuenta cuántas turbinas había en cada estado en esa versión.
+# MAGIC 3. Las 10 turbinas con peor rendimiento medio de entre las que tienen la vibración media por encima del percentil 90. En SQL, el percentil se saca con `percentile(columna, 0.9)`.
+# MAGIC 4. Las 5 subidas más bruscas de temperatura de la multiplicadora de un minuto al siguiente, sobre `silver_telemetria_wide`. El valor del minuto anterior de la misma turbina se saca con `LAG(temp_gearbox_c) OVER (PARTITION BY turbine_id ORDER BY ts)`.
+# MAGIC 5. Guarda la historia del maestro como SCD tipo 2 en `dim_turbina_scd2`, con `valido_desde`, `valido_hasta` y `es_actual`, usando un MERGE con el extracto. El truco está en meter cada cambio dos veces en el `USING`, una para cerrar la versión vieja y otra para insertar la nueva.

@@ -8,7 +8,7 @@
 # MAGIC
 # MAGIC > Necesitas el simulador (`lab4a_simulador`) en marcha en otra pestaña. En la cuenta gratuita solo hay serverless, así que la carga se lanza con `availableNow`, que procesa lo pendiente y se para.
 # MAGIC
-# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. En la última escribes tú el código entero. Los retos del final son opcionales y van de menos a más.
 
 # COMMAND ----------
 
@@ -117,19 +117,23 @@ display(spark.table(t("bronze_telemetria_stream")).groupBy("signal").count())
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC La temperatura máxima de la multiplicadora de cada turbina, quedándote con las que pasan de 75 ºC.
+# MAGIC La temperatura máxima de la multiplicadora de cada turbina, quedándote con las que pasan de 75 ºC. Esta vez escribes tú la celda entera.
 # MAGIC
 # MAGIC Tiene que salir WTG-0013, que el simulador va calentando poco a poco.
 
 # COMMAND ----------
 
-display(spark.table(t("bronze_telemetria_stream")).filter(F.col("signal") == ___)
-        .groupBy("turbine_id").agg(F.max("value").alias("temp_max")).filter(F.col("temp_max") > ___))
+# Filtra temp_gearbox_c, agrupa por turbina, saca el máximo y quédate con las que pasan de 75
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Una Gold en streaming: temperatura máxima por turbina y minuto con ventanas de un minuto y un watermark de 2 minutos.
-# MAGIC 2. Una tabla con la última lectura de cada turbina, actualizada con `foreachBatch` y un MERGE en cada lote.
-# MAGIC 3. Repite la carga con el modo `rescue` y un esquema fijo: ¿dónde acaba `firmware_build`?
+# MAGIC Van de menos a más. El último es para quien vaya sobrado.
+# MAGIC
+# MAGIC 1. ¿Cuántas filas trae cada fichero cargado? Agrupa por `_source_file`. Todos deberían traer 1.200 lecturas, 240 turbinas por 5 señales.
+# MAGIC 2. Carga los mismos ficheros en otra tabla, `reto_bronze_copia`, con un checkpoint y una ruta de esquema nuevos. Copia la función `cargar` y cambia esas tres cosas. ¿Por qué entra todo de golpe?
+# MAGIC 3. Repite la carga con un esquema fijo y el modo `rescue` (`cloudFiles.schemaEvolutionMode`). ¿Dónde acaba `firmware_build`?
+# MAGIC 4. Una tabla con la última lectura de temperatura de cada turbina, actualizada con `foreachBatch` y un MERGE en cada lote. Dentro de la función, la tabla se abre con `DeltaTable.forName(lote.sparkSession, tabla)`. En serverless hay que usar la sesión del lote, no `spark`.
+# MAGIC 5. Una Gold en streaming con la temperatura máxima por turbina y minuto, con `F.window("ts", "1 minute")`, un watermark de 2 minutos (`withWatermark`) y `outputMode("append")`. Solo salen los minutos que el watermark ya ha cerrado. ¿Por qué?

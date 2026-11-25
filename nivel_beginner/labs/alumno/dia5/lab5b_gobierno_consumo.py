@@ -8,7 +8,7 @@
 # MAGIC
 # MAGIC > Necesitas las tablas Gold del lab 3. Si no las tienes, ejecuta `00_setup/ponerse_al_dia` eligiendo el día 5.
 # MAGIC
-# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. En la última escribes tú el código entero. Los retos del final son opcionales y van de menos a más.
 
 # COMMAND ----------
 
@@ -123,22 +123,23 @@ INSTRUCCIONES
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Escribe la consulta SQL que debería generar Genie para la pregunta *¿Cuántas turbinas a revisar hay en cada parque el último día?* y compárala con la que genera.
+# MAGIC Escribe la consulta SQL que debería generar Genie para la pregunta *¿Cuántas turbinas a revisar hay en cada parque el último día?* y compárala con la que genera. Esta vez escribes tú la consulta entera.
 # MAGIC
 # MAGIC Deberían salir los parques con turbinas a revisar, con al menos una en los parques de las turbinas degradadas (WTG-0042, WTG-0117 y WTG-0199).
 
 # COMMAND ----------
 
-display(spark.sql(f"""
-SELECT parque, count(*) AS turbinas_a_revisar
-FROM {t('gold_kpi_turbina_dia')}
-WHERE fecha = (SELECT max(fecha) FROM {t('gold_kpi_turbina_dia')}) AND rendimiento_medio < ___
-GROUP BY ___"""))
+# Sobre gold_kpi_turbina_dia, cuenta por parque las turbinas con rendimiento_medio por debajo de 0,8 en el último día
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Un filtro de filas: crea una tabla de permisos `permisos_operador` (usuario, operador) y una función que solo deje ver los parques de tus operadores. Aplícala a una copia de `gold_kpi_parque_dia` con el operador de cada parque.
-# MAGIC 2. Una máscara que redondee las coordenadas de los parques salvo para quien tenga permiso.
-# MAGIC 3. Con el filtro puesto, pregúntale a Genie por *Costa da Morte* sobre esa tabla. ¿Por qué no sale nada?
+# MAGIC Van de menos a más. Del 3 al 5 van seguidos.
+# MAGIC
+# MAGIC 1. Da a `account users` lectura sobre todo tu esquema de una vez, con `GRANT SELECT ON SCHEMA`. Mira con `SHOW GRANTS` el esquema y una de sus tablas. ¿De dónde le viene el permiso a la tabla? Después quítalo.
+# MAGIC 2. Añade al dashboard un contador con la energía total del último día y un gráfico de líneas con el factor de capacidad medio de cada parque por día.
+# MAGIC 3. Un filtro de filas. Crea una tabla de permisos `permisos_operador` (usuario, operador) y una función que solo deje ver los parques de tus operadores. Aplícala a una copia de `gold_kpi_parque_dia` con el operador de cada parque. La función devuelve verdadero o falso para cada fila y se aplica con `ALTER TABLE ... SET ROW FILTER función ON (columna)`.
+# MAGIC 4. Una máscara que redondee las coordenadas de los parques salvo para quien tenga permiso. Se aplica con `ALTER TABLE ... ALTER COLUMN lat SET MASK función`.
+# MAGIC 5. Con el filtro puesto, pregúntale a Genie por *Costa da Morte* sobre esa tabla. ¿Por qué no sale nada?

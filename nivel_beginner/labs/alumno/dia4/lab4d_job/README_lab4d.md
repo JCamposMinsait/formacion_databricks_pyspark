@@ -46,6 +46,10 @@ ORDER BY period_start_time DESC;
 Menú `⋮` del job → **View as code** (YAML). Ese YAML es casi lo mismo que pondremos el viernes en el bundle.
 
 ## Retos
-1. Añade una tarea de tipo **Pipeline** que lance el pipeline del lab 4c antes de `procesar`.
-2. Convierte `procesar` en un **For each** que itere sobre la lista de parques (`{{tasks.configurar.values.parques}}`) y procese cada uno en paralelo.
-3. (Examen) ¿Qué diferencia hay entre los parámetros de job y los de tarea? ¿Qué pasa si los dos definen el mismo nombre?
+Van de menos a más. El último es para quien vaya sobrado.
+
+1. (Examen) ¿Qué diferencia hay entre los parámetros de job y los de tarea? ¿Qué pasa si los dos definen el mismo nombre?
+2. Añade al final una tarea `resumen` con un notebook nuevo que escriba cuántas alertas ha habido, leyendo el task value `n_alertas` de `procesar`. Tiene que ejecutarse por las dos ramas de la condición. Prueba qué opción de **Run if dependencies** hace falta.
+3. Haz que `resumen` guarde además una fila por ejecución en la tabla `job_historico`, con la zona, el número de alertas y la hora. Lanza el job tres veces con zonas distintas y consulta la tabla.
+4. Añade una tarea de tipo **Pipeline** que lance el pipeline del lab 4c antes de `procesar`.
+5. Convierte `procesar` en un **For each** que itere sobre la lista de parques (`{{tasks.configurar.values.parques}}`) y procese cada uno en paralelo.
