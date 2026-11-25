@@ -32,7 +32,8 @@ LIMPIEZA = {
 }
 
 # demo_telemetria la regeneran los días 1 y 2 en su preparación. Solo se borra con "todos".
-COMUNES = {"tablas": ["demo_telemetria"]}
+# El pipeline de la demo del día 4 se reutiliza en cada pasada (con full refresh). Al borrarlo se borran sus tablas.
+COMUNES = {"tablas": ["demo_telemetria"], "pipelines": [f"demo-pipeline-{ALUMNO}"]}
 
 
 def intentar(accion, texto):
@@ -65,6 +66,13 @@ def limpiar(cfg):
             if sc in [s.name for s in w.secrets.list_scopes()]:
                 w.secrets.delete_scope(scope=sc)
         intentar(borrar_scope, f"scope {sc}")
+    for nombre in cfg.get("pipelines", []):
+        def borrar_pipeline(nombre=nombre):
+            from databricks.sdk import WorkspaceClient
+            w = WorkspaceClient()
+            for p in w.pipelines.list_pipelines(filter=f"name LIKE '{nombre}'"):
+                w.pipelines.delete(pipeline_id=p.pipeline_id)
+        intentar(borrar_pipeline, f"pipeline {nombre}")
     for r in cfg.get("rutas", []):
         intentar(lambda r=r: dbutils.fs.rm(f"{RUTA_VOL}/{r}", True), f"ruta {r}")
 
