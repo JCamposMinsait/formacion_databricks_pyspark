@@ -142,6 +142,7 @@ print("Calidad BAD:", b.filter(F.col("quality") == ___).count())
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Cuenta cuántas lecturas están repetidas: misma turbina, instante y señal.
-# MAGIC 2. Busca las turbinas que no están en el maestro (`df_turbinas()`) con un `left_anti`.
-# MAGIC 3. Mira el historial de la Bronze con `DESCRIBE HISTORY` y la pestaña History en Catalog Explorer.
+# MAGIC 1. Mira el historial de la Bronze con `DESCRIBE HISTORY` y la pestaña History en Catalog Explorer. ¿Cuántas filas escribió la carga? Está en `operationMetrics`.
+# MAGIC 2. ¿De cuántos ficheros sale la Bronze? Cuenta los valores distintos de `_source_file` y busca la explicación en la celda que genera la telemetría.
+# MAGIC 3. Cuenta cuántas lecturas están repetidas: misma turbina, instante y señal.
+# MAGIC 4. Busca las turbinas que no están en el maestro (`df_turbinas()`) con un `left_anti`. Los joins los vemos mañana, así que este es para quien vaya sobrado.

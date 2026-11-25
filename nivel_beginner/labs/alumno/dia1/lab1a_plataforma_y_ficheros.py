@@ -169,6 +169,8 @@ display(spark.sql(f"SELECT modelo, count(*) AS turbinas FROM {t('lab1_turbinas')
 
 # MAGIC %md
 # MAGIC ## Retos
-# MAGIC 1. Borra `lab1_turbinas` con `DROP TABLE` y recupérala con `UNDROP TABLE`. ¿Por qué se puede?
-# MAGIC 2. Lee el CSV de parques sin `inferSchema`. ¿De qué tipo salen `lat` y `lon`?
-# MAGIC 3. Sobrescribe `lab1_parques` dos veces y mira su historial con `DESCRIBE HISTORY`.
+# MAGIC 1. Lee el CSV de parques sin `inferSchema`. ¿De qué tipo salen `lat` y `lon`?
+# MAGIC 2. Guarda los parques en Parquet en `landing/lab1/parques_parquet` y léelos sin ninguna opción. ¿De qué tipo salen ahora `lat` y `lon`? ¿Por qué no hace falta `inferSchema`?
+# MAGIC 3. Borra `lab1_turbinas` con `DROP TABLE` y recupérala con `UNDROP TABLE`. ¿Por qué se puede? ¿Qué pasaría con sus ficheros si fuera external?
+# MAGIC 4. Sobrescribe `lab1_parques` dos veces y mira su historial con `DESCRIBE HISTORY`. ¿Cuántas versiones tiene?
+# MAGIC 5. Crea un widget desplegable con los operadores que hay en `lab1_parques`, sacando la lista de la propia tabla, y enseña solo los parques del operador elegido. Para la lista te sirve `collect()` y el desplegable se crea con `dbutils.widgets.dropdown`. Cambia el valor arriba y vuelve a ejecutar.
