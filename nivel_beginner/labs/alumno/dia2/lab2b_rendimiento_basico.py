@@ -68,9 +68,9 @@ display(filas_por_particion(lecturas.repartition(8).coalesce(2)))   # 2 particio
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Reparte las lecturas en 6 particiones **por parque** (`repartition(6, "park_id")`) y cuenta filas por partición.
+# MAGIC Reparte las lecturas en 8 particiones **por parque** (`repartition(8, "park_id")`) y cuenta filas por partición.
 # MAGIC
-# MAGIC Una partición, la del parque P01, se lleva el 60 % de las filas. Eso es skew.
+# MAGIC La partición de P01 se lleva ella sola el 60 % de las filas. Eso es skew. Salen menos de 8 filas porque, con solo seis parques, el hash deja particiones vacías y junta dos parques en la misma.
 
 # COMMAND ----------
 
@@ -132,7 +132,7 @@ print(f"Con UDF: {time.time() - t0:.1f} s")
 # MAGIC ### Ahora tú
 # MAGIC Escribe lo mismo con `F.when` y mide el tiempo. Esta vez escribes tú la celda entera, siguiendo la de la UDF.
 # MAGIC
-# MAGIC Sale el mismo recuento y normalmente tarda menos que la UDF.
+# MAGIC Sale el mismo recuento salvo los nulos: la UDF los deja en nulo y `F.when` los manda a OPERABLE. Normalmente tarda menos que la UDF.
 
 # COMMAND ----------
 

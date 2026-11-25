@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 4d · Tarea 4 · Alertar
+# MAGIC # Lab 4d · Tarea alertar (rama verdadera de la condición)
 # MAGIC Solo se ejecuta si la condición del job (`n_alertas > 0`) es verdadera.
 # MAGIC Con el parámetro `modo_estricto = true` el notebook falla a propósito para practicar notificaciones y **Repair run**.
 

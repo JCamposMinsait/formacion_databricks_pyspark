@@ -44,6 +44,10 @@ if DIA >= 2 and falta("bronze_telemetria"):
     INICIO = dt.datetime(2026, 11, 2, 0, 0, 0, tzinfo=dt.timezone.utc)
     DEGRADADAS = ["WTG-0042", "WTG-0117", "WTG-0199"]
     CALIENTES = ["WTG-0013", "WTG-0187"]
+    PARADAS = [("WTG-0077", 120, 420), ("WTG-0160", 1680, 1860), ("WTG-0222", 1200, 1860)]   # averías
+    en_parada = F.lit(False)
+    for turbina, desde, hasta in PARADAS:
+        en_parada = en_parada | ((F.col("turbine_id") == turbina) & (F.col("m") >= desde) & (F.col("m") < hasta))
 
     base = (df_turbinas().select("turbine_id", "park_id", "potencia_nominal_kw", "diametro_rotor_m")
             .crossJoin(spark.range(0, DIAS * 1440).withColumnRenamed("id", "m"))
@@ -62,6 +66,8 @@ if DIA >= 2 and falta("bronze_telemetria"):
                                                         * F.pow("wind_speed", 3) * F.col("cp")))
                         + F.randn(seed=2) * 40)
             .withColumn("rotor_rpm", F.least(F.lit(14.5), F.col("wind_speed") * 1.15) + F.randn(seed=3) * 0.2)
+            .withColumn("power_kw", F.when(en_parada, 0.0).otherwise(F.col("power_kw")))
+            .withColumn("rotor_rpm", F.when(en_parada, 0.0).otherwise(F.col("rotor_rpm")))
             .withColumn("temp_gearbox_c", F.lit(42.0) + F.col("power_kw") / F.col("potencia_nominal_kw") * 28 + F.randn(seed=4) * 1.5
                         + F.when(F.col("turbine_id").isin(CALIENTES), 8.0).otherwise(0.0))
             .withColumn("vibration_mm_s", F.abs(F.randn(seed=5)) * 0.6 + F.col("rotor_rpm") * 0.05))
@@ -211,8 +217,8 @@ if DIA >= 4 and falta("gold_kpi_turbina_dia", "gold_kpi_parque_dia", "dim_turbin
       turbine_id, park_id, parque, modelo, potencia_nominal_kw,
       round(sum(energia_kwh) / 1000, 3) AS energia_mwh,
       round(sum(energia_kwh) / NULLIF(potencia_nominal_kw * 24, 0), 4) AS factor_capacidad,
-      round(count_if(wind_speed BETWEEN 3 AND 25 AND power_kw > 0)
-            / NULLIF(count_if(wind_speed BETWEEN 3 AND 25), 0), 4) AS disponibilidad,
+      round(count_if(wind_speed >= 3 AND wind_speed < 25 AND power_kw > 0)
+            / NULLIF(count_if(wind_speed >= 3 AND wind_speed < 25), 0), 4) AS disponibilidad,
       round(avg(rendimiento), 3) AS rendimiento_medio,
       round(max(temp_gearbox_c), 1) AS temp_gearbox_max,
       round(avg(vibration_mm_s), 3) AS vibracion_media

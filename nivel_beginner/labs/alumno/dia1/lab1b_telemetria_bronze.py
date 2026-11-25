@@ -18,7 +18,7 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Generar la telemetría
-# MAGIC Esta celda hace de concentrador de los parques. Escribe ficheros JSON con una lectura por turbina, minuto y señal (formato EAV). Los datos vienen sucios a propósito, con valores `-9999` cuando el sensor no tiene lectura, nulos, duplicados, lecturas de calidad `BAD` y turbinas que no existen en el maestro.
+# MAGIC Esta celda hace de concentrador de los parques. Escribe ficheros JSON con una lectura por turbina, minuto y señal (formato EAV). Los datos vienen sucios a propósito, con valores `-9999` cuando el sensor no tiene lectura, nulos, duplicados, lecturas de calidad `BAD` y turbinas que no existen en el maestro. Además, tres turbinas se quedan paradas unas horas por avería.
 # MAGIC
 # MAGIC Con `dias = 2` salen unos 3,5 millones de filas. No subas el valor, que la cuenta gratuita tiene una cuota diaria de cómputo.
 
@@ -31,6 +31,12 @@ DIAS = int(dbutils.widgets.get("dias"))
 INICIO = dt.datetime(2026, 11, 2, 0, 0, 0, tzinfo=dt.timezone.utc)
 DEGRADADAS = ["WTG-0042", "WTG-0117", "WTG-0199"]     # rinden menos de lo que deberían
 CALIENTES = ["WTG-0013", "WTG-0187"]                  # la multiplicadora se calienta
+PARADAS = [("WTG-0077", 120, 420), ("WTG-0160", 1680, 1860), ("WTG-0222", 1200, 1860)]   # averías: turbina, minuto en que para y en que vuelve
+
+# Vale True en los minutos en que una turbina está parada por avería
+en_parada = F.lit(False)
+for turbina, desde, hasta in PARADAS:
+    en_parada = en_parada | ((F.col("turbine_id") == turbina) & (F.col("m") >= desde) & (F.col("m") < hasta))
 
 base = (df_turbinas().select("turbine_id", "park_id", "potencia_nominal_kw", "diametro_rotor_m")
         .crossJoin(spark.range(0, DIAS * 1440).withColumnRenamed("id", "m"))
@@ -45,6 +51,8 @@ base = (df_turbinas().select("turbine_id", "park_id", "potencia_nominal_kw", "di
                                                     F.lit(0.5 * 1.225 * math.pi / 1000) * F.pow(F.col("diametro_rotor_m") / 2, 2)
                                                     * F.pow("wind_speed", 3) * F.col("cp"))) + F.randn(seed=2) * 40)
         .withColumn("rotor_rpm", F.least(F.lit(14.5), F.col("wind_speed") * 1.15) + F.randn(seed=3) * 0.2)
+        .withColumn("power_kw", F.when(en_parada, 0.0).otherwise(F.col("power_kw")))       # parada: no produce aunque haya viento
+        .withColumn("rotor_rpm", F.when(en_parada, 0.0).otherwise(F.col("rotor_rpm")))
         .withColumn("temp_gearbox_c", F.lit(42.0) + F.col("power_kw") / F.col("potencia_nominal_kw") * 28 + F.randn(seed=4) * 1.5
                     + F.when(F.col("turbine_id").isin(CALIENTES), 8.0).otherwise(0.0))
         .withColumn("vibration_mm_s", F.abs(F.randn(seed=5)) * 0.6 + F.col("rotor_rpm") * 0.05))

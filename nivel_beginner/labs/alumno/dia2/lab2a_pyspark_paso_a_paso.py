@@ -90,7 +90,7 @@ display(potencia.select("turbine_id", "ts", "value", "potencia_mw", "estado").li
 # MAGIC ### Ahora tú
 # MAGIC Sobre las lecturas de viento (`wind_speed`), una columna `zona` que sea `CALMA` por debajo de 3 m/s, `CORTE` desde 25 m/s y `OPERABLE` en el resto.
 # MAGIC
-# MAGIC Casi todas son OPERABLE, hay algunas CALMA y CORTE casi no aparece.
+# MAGIC Casi todas son OPERABLE y hay algunas CALMA. CORTE no aparece, porque en estos datos el viento nunca llega a 25 m/s.
 
 # COMMAND ----------
 
@@ -199,7 +199,7 @@ display(spark.sql("""
 # MAGIC ### Ahora tú
 # MAGIC En una celda `%sql`, la temperatura máxima por parque usando `lecturas_v`.
 # MAGIC
-# MAGIC Sale una fila por parque, con el de WTG-0013 y WTG-0187 arriba.
+# MAGIC Sale una fila por parque. Arriba quedan P01 y P06, los parques de WTG-0013 y WTG-0187.
 
 # COMMAND ----------
 

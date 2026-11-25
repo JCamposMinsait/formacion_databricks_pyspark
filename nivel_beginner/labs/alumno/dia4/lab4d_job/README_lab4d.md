@@ -32,7 +32,7 @@ Cómputo: **Serverless** en todas.
 1. **Run now**. En la ejecución puedes ver el grafo, la duración de cada tarea, la rama que ha tomado la condición y, dentro de cada tarea, la pestaña de *task values*.
 2. **Run now with different parameters** con `zona = NORTE` y `umbral_temp = 90`. Debería ir por `todo_ok`.
 3. Ahora con `zona = TODAS` y `modo_estricto = true`. La tarea `alertar` falla a propósito y te llega el email.
-4. Cambia el parámetro `modo_estricto` a `false` en la tarea y pulsa **Repair run**. Solo se relanza lo que ha fallado.
+4. Pulsa **Repair run**, cambia en el diálogo el parámetro del job `modo_estricto` a `false` y lanza la reparación. Solo se relanza lo que ha fallado.
 
 ## 5 · Mirar el histórico con tablas de sistema (si tienes permiso)
 ```sql
@@ -52,4 +52,4 @@ Van de menos a más. El último es para quien vaya sobrado.
 2. Añade al final una tarea `resumen` con un notebook nuevo que escriba cuántas alertas ha habido, leyendo el task value `n_alertas` de `procesar`. Tiene que ejecutarse por las dos ramas de la condición. Prueba qué opción de **Run if dependencies** hace falta.
 3. Haz que `resumen` guarde además una fila por ejecución en la tabla `job_historico`, con la zona, el número de alertas y la hora. Lanza el job tres veces con zonas distintas y consulta la tabla.
 4. Añade una tarea de tipo **Pipeline** que lance el pipeline del lab 4c antes de `procesar`.
-5. Convierte `procesar` en un **For each** que itere sobre la lista de parques (`{{tasks.configurar.values.parques}}`) y procese cada uno en paralelo.
+5. Añade una tarea **For each**, `revisar_parques`, que dependa de `configurar` y recorra la lista de parques (`{{tasks.configurar.values.parques}}`). En cada vuelta tiene que lanzar un notebook nuevo que enseñe la temperatura máxima de cada turbina de ese parque, con varios parques a la vez.

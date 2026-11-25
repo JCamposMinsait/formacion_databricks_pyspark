@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 4d · Tarea 4 (rama falsa) · Sin alertas
+# MAGIC # Lab 4d · Tarea todo_ok (rama falsa de la condición)
 
 # COMMAND ----------
 

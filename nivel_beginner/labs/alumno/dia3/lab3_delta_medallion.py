@@ -23,7 +23,7 @@
 # COMMAND ----------
 
 spark.sql(f"DROP TABLE IF EXISTS {t('delta_turbinas')}")
-df_turbinas().limit(5).select("turbine_id", "modelo", F.lit("OPERATIVA").alias("estado")) \
+df_turbinas().orderBy("turbine_id").limit(5).select("turbine_id", "modelo", F.lit("OPERATIVA").alias("estado")) \
     .write.saveAsTable(t("delta_turbinas"))
 spark.sql(f"UPDATE {t('delta_turbinas')} SET estado = 'MANTENIMIENTO' WHERE turbine_id = 'WTG-0003'")
 spark.sql(f"DELETE FROM {t('delta_turbinas')} WHERE turbine_id = 'WTG-0005'")
@@ -210,7 +210,7 @@ SELECT
   turbine_id, park_id, parque, modelo, potencia_nominal_kw,
   round(sum(energia_kwh) / 1000, 3) AS energia_mwh,
   round(sum(energia_kwh) / NULLIF(potencia_nominal_kw * 24, 0), 4) AS factor_capacidad,
-  round(count_if(wind_speed BETWEEN 3 AND 25 AND power_kw > 0) / NULLIF(count_if(wind_speed BETWEEN 3 AND 25), 0), 4) AS disponibilidad,
+  round(count_if(wind_speed >= 3 AND wind_speed < 25 AND power_kw > 0) / NULLIF(count_if(wind_speed >= 3 AND wind_speed < 25), 0), 4) AS disponibilidad,
   round(avg(rendimiento), 3) AS rendimiento_medio,
   round(max(temp_gearbox_c), 1) AS temp_gearbox_max,
   round(avg(vibration_mm_s), 3) AS vibracion_media
@@ -275,5 +275,5 @@ for col, txt in [("factor_capacidad", "Energía real / energía máxima a potenc
 # MAGIC 1. Las 5 turbinas con peor disponibilidad media en `gold_kpi_turbina_dia`, con su parque y su modelo.
 # MAGIC 2. Con `DESCRIBE HISTORY`, busca la versión de `silver_dim_turbina` de justo antes del MERGE y cuenta cuántas turbinas había en cada estado en esa versión.
 # MAGIC 3. Las 10 turbinas con peor rendimiento medio de entre las que tienen la vibración media por encima del percentil 90. En SQL, el percentil se saca con `percentile(columna, 0.9)`.
-# MAGIC 4. Las 5 subidas más bruscas de temperatura de la multiplicadora de un minuto al siguiente, sobre `silver_telemetria_wide`. El valor del minuto anterior de la misma turbina se saca con `LAG(temp_gearbox_c) OVER (PARTITION BY turbine_id ORDER BY ts)`.
+# MAGIC 4. Las 5 subidas más bruscas de la temperatura media de la multiplicadora de una hora a la siguiente, sobre `silver_telemetria_wide`. Primero saca la media por turbina y hora con `date_trunc('hour', ts)`, y después la de la hora anterior de la misma turbina con `LAG(temp_media) OVER (PARTITION BY turbine_id ORDER BY hora)`. ¿Qué tienen en común las que salen arriba?
 # MAGIC 5. Guarda la historia del maestro como SCD tipo 2 en `dim_turbina_scd2`, con `valido_desde`, `valido_hasta` y `es_actual`, usando un MERGE con el extracto. El truco está en meter cada cambio dos veces en el `USING`, una para cerrar la versión vieja y otra para insertar la nueva.
