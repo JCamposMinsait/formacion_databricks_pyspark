@@ -1,13 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 5b · Gobernanza en Unity Catalog y consumo (guía del alumno)
+# MAGIC # Lab 5b · Gobernanza en Unity Catalog y consumo
 # MAGIC
-# MAGIC **Duración:** ~70 min · Sobre las tablas Gold del día 3.
+# MAGIC Duración: 70 min aproximadamente. Trabajamos sobre las tablas Gold del día 3.
 # MAGIC
-# MAGIC > **Cómo usar esta guía**
-# MAGIC > - Cada paso tiene un objetivo, la slide del curso donde está explicado y unas pistas.
-# MAGIC > - Rellena lo marcado con `___` o `# TODO`. Si una celda no tiene nada que rellenar, léela y ejecútala.
-# MAGIC > - Si te atascas: primero la slide, luego la documentación de Databricks y, como último recurso, la solución en `labs/soluciones/`.
+# MAGIC Hay que completar lo marcado con `___` o `# TODO`. Cada paso indica la slide donde está explicado.
 
 # COMMAND ----------
 
@@ -22,13 +19,12 @@ spark.sql(f"USE {CATALOGO}.{ESQUEMA}")
 
 # MAGIC %md
 # MAGIC ## 1 · Permisos
-# MAGIC **Objetivo:** dar a un grupo acceso de lectura a tus tablas Gold, y quitárselo.
+# MAGIC Da a un grupo acceso de lectura a tus tablas Gold y luego quítaselo.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 5 · Privilegios en Unity Catalog · GRANT y REVOKE
-# MAGIC
-# MAGIC **Pistas**
 # MAGIC - Para leer una tabla hacen falta tres privilegios: en el catálogo, en el esquema y en la tabla.
 # MAGIC - En una empresa, USE CATALOG solo lo da el dueño del catálogo. En Free Edition el catálogo es tuyo, así que puedes dar los tres.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 5 · Privilegios en Unity Catalog · GRANT y REVOKE.
 
 # COMMAND ----------
 
@@ -55,16 +51,15 @@ display(spark.sql(f"SHOW GRANTS `{GRUPO}` ON SCHEMA {CATALOGO}.{ESQUEMA}"))
 
 # MAGIC %md
 # MAGIC ## 2 · Filtro de filas y máscara de columna
-# MAGIC **Objetivo:** que cada usuario vea solo los parques de sus operadores y que las coordenadas exactas solo las vea quien tenga permiso.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 5 · Filtros de filas y máscaras de columnas
+# MAGIC Cada usuario tiene que ver solo los parques de sus operadores, y las coordenadas exactas solo quien tenga permiso.
 # MAGIC
 # MAGIC En una empresa esto se decide con grupos de cuenta y `is_account_group_member`. En Free Edition no hay grupos de cuenta, así que usamos una **tabla de permisos**: quién es cada usuario, qué operadores puede ver y si ve las coordenadas exactas.
 # MAGIC
-# MAGIC **Pistas**
 # MAGIC - `current_user()` devuelve quién está consultando.
 # MAGIC - `EXISTS (SELECT 1 FROM tabla WHERE ...)` devuelve true si hay alguna fila que cumpla la condición.
 # MAGIC - `SET ROW FILTER función ON (columna)` y `ALTER COLUMN columna SET MASK función`.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 5 · Filtros de filas y máscaras de columnas.
 
 # COMMAND ----------
 
@@ -114,14 +109,13 @@ display(spark.table("gold_ubicacion_parques"))
 
 # MAGIC %md
 # MAGIC ## 3 · Auditoría y coste
+# MAGIC Vamos a ver quién ha leído tus tablas y cuánto se ha gastado.
+# MAGIC
 # MAGIC > En Free Edition puede que alguna tabla de sistema no esté disponible. Si falla, se ve en la teoría.
-# MAGIC **Objetivo:** saber quién ha leído tus tablas y cuánto se ha gastado.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 5 · Auditoría y linaje con tablas de sistema
+# MAGIC - `request_params` es un map y se accede con `request_params['clave']`.
 # MAGIC
-# MAGIC **Pistas**
-# MAGIC - Si en tu cuenta no están las tablas de sistema, se ve en la teoría.
-# MAGIC - request_params es un map: se accede con request_params['clave'].
+# MAGIC Lo tienes en la slide Día 5 · Auditoría y linaje con tablas de sistema.
 
 # COMMAND ----------
 
@@ -147,13 +141,11 @@ display(spark.table("gold_ubicacion_parques"))
 # MAGIC ## 4 · Databricks SQL o Lakebase
 # MAGIC Lakebase se ve en la teoría y no se monta en el laboratorio.
 # MAGIC
-# MAGIC **Pregunta:** ¿qué usarías para un dashboard que resume millones de lecturas, y qué para una aplicación que consulta la ficha de una turbina miles de veces por minuto?
-# MAGIC
-# MAGIC **Slide de referencia:** Día 5 · Lakebase: Postgres para aplicaciones
+# MAGIC ¿Qué usarías para un dashboard que resume millones de lecturas? ¿Y para una aplicación que consulta la ficha de una turbina miles de veces por minuto?
 # MAGIC
 # MAGIC ## 5 · Genie (UI, ~20 min)
 # MAGIC Día 5 · Genie · Cómo conseguir que Genie acierte
-# MAGIC 1. Genie → New → añade `gold_kpi_turbina_dia`, `gold_kpi_parque_dia` y `dim_turbina_scd2`.
+# MAGIC 1. En Genie → New, añade `gold_kpi_turbina_dia`, `gold_kpi_parque_dia` y `dim_turbina_scd2`.
 # MAGIC 2. Escribe tú las **instrucciones**: idioma, qué significa "producción" y "rendimiento", cómo expresar el factor de capacidad y qué es una turbina "a revisar".
 # MAGIC 3. Añade una **consulta de ejemplo** en SQL para "turbinas a revisar ayer".
 # MAGIC 4. Prueba estas preguntas y revisa el SQL que genera:
@@ -164,3 +156,5 @@ display(spark.table("gold_ubicacion_parques"))
 # MAGIC
 # MAGIC ## Reto final
 # MAGIC Le preguntáis a Genie por la producción de *Costa da Morte* sobre `gold_parques` y no sale nada. ¿Por qué? (pista: sección 2)
+# MAGIC
+# MAGIC Lo tienes en la slide Día 5 · Lakebase: Postgres para aplicaciones.

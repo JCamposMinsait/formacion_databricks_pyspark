@@ -1,17 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 2b · Data skew sin Spark UI (guía del alumno)
+# MAGIC # Lab 2b · Data skew sin Spark UI
 # MAGIC
-# MAGIC **Duración:** ~30 min
+# MAGIC Duración: 30 min aproximadamente.
 # MAGIC
 # MAGIC En Free Edition solo hay cómputo serverless, así que no hay Spark UI. El skew lo vamos a ver contando cuántas filas caen en cada partición, mirando los planes con `explain` y abriendo el Query Profile. En un clúster clásico, lo mismo se ve en el Spark UI, en la pestaña Stages, comparando la duración máxima de las tareas con la mediana.
 # MAGIC
 # MAGIC El caso: un join entre las lecturas y una tabla de tarifas por parque, con el parque P01 llevándose el 70 % de las filas.
 # MAGIC
-# MAGIC > **Cómo usar esta guía**
-# MAGIC > - Cada paso tiene un objetivo, la slide del curso donde está explicado y unas pistas.
-# MAGIC > - Rellena lo marcado con `___` o `# TODO`. Si una celda no tiene nada que rellenar, léela y ejecútala.
-# MAGIC > - Si te atascas: primero la slide, luego la documentación de Databricks y, como último recurso, la solución.
+# MAGIC En las celdas hay que completar lo que está marcado con `___` o `# TODO`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -21,7 +18,7 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Datos desequilibrados
-# MAGIC Léela y ejecútala. Cinco millones de lecturas, el 70 % del parque P01, y una tabla de tarifas con seis filas.
+# MAGIC Generamos cinco millones de lecturas, el 70 % del parque P01, y una tabla de tarifas con seis filas. Esta celda solo hay que ejecutarla.
 
 # COMMAND ----------
 
@@ -40,14 +37,12 @@ display(grande.groupBy("park_id").count().orderBy("park_id"))
 
 # MAGIC %md
 # MAGIC ## 2 · Ver el skew: filas por partición
-# MAGIC **Objetivo:** repartir las filas por `park_id` en 8 particiones y contar cuántas caen en cada una.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Data skew: cuando una tarea hace todo el trabajo
-# MAGIC
-# MAGIC **Pistas**
+# MAGIC Reparte las filas por `park_id` en 8 particiones y cuenta cuántas caen en cada una.
 # MAGIC - `repartition(n, "columna")` reparte por el valor de la columna.
 # MAGIC - `F.spark_partition_id()` dice en qué partición está cada fila.
 # MAGIC - En el resultado, la pestaña de gráfico enseña el reparto de un vistazo.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 2 · Data skew: cuando una tarea hace todo el trabajo.
 
 # COMMAND ----------
 
@@ -60,20 +55,18 @@ display(reparto)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Pregunta:** hay 8 particiones, ¿cuántas tienen datos? ¿Qué tarea tardaría más en el Spark UI?
+# MAGIC Hay 8 particiones. ¿Cuántas tienen datos? ¿Qué tarea tardaría más en el Spark UI?
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 3 · Join con sort-merge
-# MAGIC **Objetivo:** forzar un sort-merge join, ver su plan y medirlo.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Cómo ejecuta Spark un join
-# MAGIC
-# MAGIC **Pistas**
+# MAGIC Forzamos un sort-merge join, miramos su plan y lo medimos.
 # MAGIC - Si no se fuerza, Spark hace broadcast solo porque `tarifas` es pequeña. El hint `"merge"` fuerza el sort-merge.
 # MAGIC - Después de ejecutar, abre **See performance** debajo del resultado para ver el Query Profile.
-# MAGIC - En serverless, AQE está siempre activo y puede partir la partición grande. Por eso el tiempo puede no ser malo: aquí importa entender el reparto.
+# MAGIC - En serverless, AQE está siempre activo y puede partir la partición grande, así que el tiempo puede no salir tan malo. Lo que importa aquí es entender el reparto.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 2 · Cómo ejecuta Spark un join.
 
 # COMMAND ----------
 
@@ -93,13 +86,11 @@ r_smj = medir(smj, "sort-merge")
 
 # MAGIC %md
 # MAGIC ## 4 · Broadcast
-# MAGIC **Objetivo:** hacer el mismo join copiando la tabla pequeña a todas las máquinas.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Cómo se arregla el skew, en este orden
-# MAGIC
-# MAGIC **Pistas**
+# MAGIC Hacemos el mismo join copiando la tabla pequeña a todas las máquinas.
 # MAGIC - `F.broadcast(df)` marca la tabla que se copia.
 # MAGIC - En el plan tiene que salir BroadcastHashJoin y ningún Exchange en el lado grande.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 2 · Cómo se arregla el skew, en este orden.
 
 # COMMAND ----------
 
@@ -115,14 +106,12 @@ grande.join(tarifas, "park_id").explain()
 
 # MAGIC %md
 # MAGIC ## 5 · Salting
-# MAGIC **Objetivo:** repartir P01 en varias particiones añadiendo una sal a la clave.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Cómo se arregla el skew, en este orden
-# MAGIC
-# MAGIC **Pistas**
+# MAGIC Repartimos P01 en varias particiones añadiendo una sal a la clave.
 # MAGIC - En el lado grande, la sal es un número aleatorio entre 0 y N_SAL - 1.
 # MAGIC - El lado pequeño se replica una vez por cada valor de la sal, con un `crossJoin`.
 # MAGIC - El join pasa a hacerse por `park_id` y `sal`.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 2 · Cómo se arregla el skew, en este orden.
 
 # COMMAND ----------
 
@@ -144,7 +133,8 @@ r_sal = medir(sal, "salting")
 
 # MAGIC %md
 # MAGIC ## 6 · El resultado es el mismo
-# MAGIC Léela y ejecútala. Las tres versiones tienen que dar lo mismo: lo único que cambia es cómo se reparte el trabajo.
+# MAGIC
+# MAGIC Las tres versiones tienen que dar exactamente lo mismo. Lo único que cambia es cómo se reparte el trabajo.
 
 # COMMAND ----------
 

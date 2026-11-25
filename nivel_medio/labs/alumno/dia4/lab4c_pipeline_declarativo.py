@@ -1,5 +1,5 @@
 """
-Lab 4c · Pipeline declarativo (guía del alumno)
+Lab 4c · Pipeline declarativo
 Día 4 · Declaras qué tablas quieres · Streaming tables y vistas materializadas · Expectations · AUTO CDC
 Configuración del pipeline: ruta_landing y tabla_maestro. Esquema de destino: eolica_<alumno>_pipeline (ver README_lab4.md).
 Rellena lo marcado con TODO. Solución: labs/soluciones/dia4/lab4c_pipeline_declarativo.py

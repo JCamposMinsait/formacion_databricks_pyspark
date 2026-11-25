@@ -1,8 +1,8 @@
 # Labs del curso Databricks y PySpark
 
 Cada lab tiene dos versiones:
-- `alumno/`: guías paso a paso. El código de los pasos difíciles va escrito y explicado, y en los ejercicios **Ahora tú** escriben ellos rellenando los `___`. Al final de cada lab hay retos de nivel avanzado.
-- `soluciones/`: lo mismo, con los ejercicios y los retos resueltos. Solo para el profesor.
+- `alumno/`: los labs paso a paso. El código de los pasos difíciles ya viene escrito y explicado. En los ejercicios **Ahora tú** los alumnos completan los `___`. Al final de cada lab hay unos retos opcionales.
+- `soluciones/`: lo mismo, con los ejercicios y los retos resueltos. No se reparte a los alumnos.
 
 ## Orden
 | Día | Lab | Duración |
@@ -24,10 +24,10 @@ Si alguien se pierde un día, `00_setup/ponerse_al_dia` le crea lo que le falte 
 
 ## Entorno: Databricks Free Edition
 Cada alumno trabaja en su propia cuenta, creada con un correo personal antes del primer día (ver el LEEME del paquete de alumnos).
-- Solo hay cómputo serverless: no hay Spark UI y el streaming se lanza con `availableNow`.
-- Hay una cuota diaria de cómputo: los labs generan dos días de telemetría para no agotarla.
+- Solo hay cómputo serverless, así que no hay Spark UI y el streaming se lanza con `availableNow`.
+- Hay una cuota diaria de cómputo. Por eso los labs generan solo dos días de telemetría.
 - Solo puede haber un pipeline activo a la vez.
-- No hay grupos de cuenta ni Service Principal: los permisos se dan a `account users`.
+- No hay grupos de cuenta ni Service Principal, así que los permisos se dan a `account users`.
 - Para el día 5 hace falta una cuenta de GitHub.
 - Si no se puede crear el catálogo `formacion`, `00_config` usa el que trae la cuenta.
 

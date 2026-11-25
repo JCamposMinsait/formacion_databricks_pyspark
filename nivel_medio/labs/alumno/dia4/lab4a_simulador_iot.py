@@ -1,14 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 4 · Simulador IoT en tiempo real (cada 10 s)
+# MAGIC # Lab 4a · Simulador IoT en tiempo real (cada 10 s)
 # MAGIC
 # MAGIC Abridlo en **otra pestaña** y dejadlo corriendo mientras trabajáis en el lab 4b/4c.
 # MAGIC Cada 10 s escribe un fichero JSON con una lectura por turbina y señal en `telemetria_stream/`.
 # MAGIC
 # MAGIC Incluye a propósito:
-# MAGIC - **Datos tardíos**: ~3 % de las lecturas llegan con un `ts` de hasta 3 min atrás (para entender los *watermarks*).
-# MAGIC - **Anomalía**: la turbina `WTG-0013` se calienta progresivamente (para la alerta de la práctica).
-# MAGIC - **Cambio de esquema** a mitad: a partir de la iteración 30 aparece el campo `firmware_build` (Auto Loader *schema evolution*).
+# MAGIC - **Datos tardíos**: alrededor del 3 % de las lecturas llega con un `ts` de hasta 3 min antes. Sirven para practicar con los *watermarks*.
+# MAGIC - **Anomalía**: la turbina `WTG-0013` se va calentando poco a poco. Es la que dispara la alerta de la práctica.
+# MAGIC - **Cambio de esquema**: a partir de la iteración 30 aparece el campo `firmware_build`, para probar la *schema evolution* de Auto Loader.
 
 # COMMAND ----------
 

@@ -40,7 +40,7 @@ Las tablas se crean en un esquema aparte, `eolica_<usuario>_bundle`, para no cho
 
 ## Producción
 - El target `prod` lleva `run_as` con un **Service Principal**: los jobs se ejecutan con su identidad, no con la de quien despliega.
-- Solo la CI despliega a prod (`.github/workflows/deploy.yml`). Las personas, como mucho, `validate`.
+- Solo la CI despliega a prod (`.github/workflows/deploy.yml`). Las personas, como mucho, ejecutan `validate`.
 - Para destruir lo desplegado en dev: `databricks bundle destroy -t dev`.
 
 ## En Free Edition

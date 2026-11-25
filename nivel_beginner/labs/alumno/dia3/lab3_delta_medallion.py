@@ -1,17 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 3 · Delta Lake y de Bronze a Gold (guía del alumno)
+# MAGIC # Lab 3 · Delta Lake y de Bronze a Gold
 # MAGIC
-# MAGIC **Duración:** ~2 h
+# MAGIC Duración: 2 h aproximadamente.
 # MAGIC
-# MAGIC Practicas Delta con una tabla pequeña y después haces el recorrido completo: la Bronze del lunes se limpia en Silver y acaba en una Gold con los KPIs de cada parque y día.
+# MAGIC Primero practicamos Delta con una tabla pequeña. Después hacemos el recorrido completo, desde la Bronze del lunes, que se limpia en Silver, hasta una Gold con los KPIs de cada parque y día.
 # MAGIC
-# MAGIC > Lo mínimo que tienes que acabar son las tablas Gold: el jueves y el viernes trabajamos sobre ellas. Si te falta la Bronze, ejecuta antes `00_setup/ponerse_al_dia` eligiendo el día 3.
+# MAGIC > Hay que terminar al menos las tablas Gold, porque el jueves y el viernes trabajamos sobre ellas. Si te falta la Bronze, ejecuta antes `00_setup/ponerse_al_dia` eligiendo el día 3.
 # MAGIC
-# MAGIC > **Cómo seguir esta guía**
-# MAGIC > - Va paso a paso: lee la explicación, ejecuta la celda y mira el resultado. El código de los pasos difíciles ya está escrito.
-# MAGIC > - En los ejercicios **Ahora tú** te toca escribir a ti: rellena lo marcado con `___`. Si te atascas, mira el código de justo encima.
-# MAGIC > - Los retos del final son para quien vaya rápido.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -21,7 +18,7 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Delta: crear y escribir
-# MAGIC Una tabla pequeña para practicar. Cada escritura queda apuntada en el diario de la tabla como una versión nueva.
+# MAGIC Creamos una tabla pequeña para practicar. Cada escritura queda apuntada en el diario de la tabla como una versión nueva.
 
 # COMMAND ----------
 
@@ -38,7 +35,7 @@ display(spark.table(t("delta_turbinas")).orderBy("turbine_id"))
 # MAGIC ### Ahora tú
 # MAGIC Pon la turbina `WTG-0001` en estado `PARADA` y mira el historial de la tabla.
 # MAGIC
-# MAGIC **Comprueba:** en el historial salen cuatro versiones: la creación, el UPDATE, el DELETE y tu UPDATE.
+# MAGIC En el historial deberían salir cuatro versiones (la creación, el UPDATE, el DELETE y tu UPDATE).
 
 # COMMAND ----------
 
@@ -49,7 +46,7 @@ display(spark.sql(f"DESCRIBE HISTORY {t('delta_turbinas')}").select("version", "
 
 # MAGIC %md
 # MAGIC ## 2 · Historial: time travel y RESTORE
-# MAGIC Se puede consultar cualquier versión anterior y volver a ella. RESTORE no borra la historia: crea una versión nueva igual a la antigua.
+# MAGIC Se puede consultar cualquier versión anterior y volver a ella. RESTORE no borra la historia, sino que crea una versión nueva igual a la antigua.
 
 # COMMAND ----------
 
@@ -66,7 +63,7 @@ display(spark.table(t("delta_turbinas")).orderBy("turbine_id"))
 # MAGIC ### Ahora tú
 # MAGIC Cuenta las filas de la tabla en la versión 2, la del DELETE.
 # MAGIC
-# MAGIC **Comprueba:** salen 4 filas: la versión 2 es justo después de borrar WTG-0005.
+# MAGIC Salen 4 filas, porque la versión 2 es la de justo después de borrar WTG-0005.
 
 # COMMAND ----------
 
@@ -76,7 +73,7 @@ display(spark.sql(f"SELECT count(*) AS filas FROM {t('delta_turbinas')} VERSION 
 
 # MAGIC %md
 # MAGIC ## 3 · MERGE: el maestro al día
-# MAGIC El maestro de turbinas es una tabla de Silver. Llega un extracto del sistema de mantenimiento: diez turbinas han pasado a mantenimiento. MERGE actualiza las que ya existen e inserta las nuevas, y se puede relanzar sin duplicar.
+# MAGIC El maestro de turbinas es una tabla de Silver. Del sistema de mantenimiento llega un extracto con diez turbinas que han pasado a mantenimiento. MERGE actualiza las que ya existen e inserta las nuevas, y se puede relanzar sin duplicar.
 
 # COMMAND ----------
 
@@ -103,7 +100,7 @@ display(spark.sql(MERGE))     # 10 filas actualizadas
 # MAGIC ### Ahora tú
 # MAGIC Relanza el MERGE y cuenta cuántas turbinas hay en cada estado.
 # MAGIC
-# MAGIC **Comprueba:** el MERGE relanzado no actualiza nada (num_updated_rows = 0) y salen 10 en MANTENIMIENTO y 230 OPERATIVAS.
+# MAGIC El MERGE relanzado no actualiza nada (num_updated_rows = 0). Deberían salir 10 en MANTENIMIENTO y 230 OPERATIVAS.
 
 # COMMAND ----------
 
@@ -114,7 +111,7 @@ display(spark.table(t("silver_dim_turbina")).groupBy(___).count())
 
 # MAGIC %md
 # MAGIC ## 4 · Silver: limpiar y deduplicar
-# MAGIC En Silver el dato queda limpio: `ts` como fecha y hora, el `-9999` convertido en nulo, las potencias negativas a cero y sin lecturas repetidas.
+# MAGIC En Silver el dato queda limpio. `ts` pasa a timestamp, el `-9999` a nulo, las potencias negativas a cero y se quitan las lecturas repetidas.
 
 # COMMAND ----------
 
@@ -131,7 +128,7 @@ limpio = (bronze
 # MAGIC ### Ahora tú
 # MAGIC ¿Cuántas lecturas repetidas se han quitado?
 # MAGIC
-# MAGIC **Comprueba:** sale alrededor del 0,5 % de las lecturas de la Bronze.
+# MAGIC Debería salir alrededor del 0,5 % de las lecturas de la Bronze.
 
 # COMMAND ----------
 
@@ -141,7 +138,7 @@ print("Repetidas quitadas:", bronze.count() - ___.count())
 
 # MAGIC %md
 # MAGIC ## 5 · Silver: cruzar con el maestro
-# MAGIC Cada lectura se enriquece con los datos de su turbina. Las lecturas de turbinas que no están en el maestro no se tiran: van a una tabla de cuarentena para revisarlas.
+# MAGIC Cada lectura se enriquece con los datos de su turbina. Las de turbinas que no están en el maestro no se tiran, se guardan en una tabla de cuarentena para revisarlas.
 
 # COMMAND ----------
 
@@ -159,7 +156,7 @@ print("silver_telemetria:", spark.table(t("silver_telemetria")).count(), "filas"
 # MAGIC ### Ahora tú
 # MAGIC Cuenta las lecturas en cuarentena por turbina.
 # MAGIC
-# MAGIC **Comprueba:** salen WTG-0901 y WTG-0902, las dos turbinas que no existen en el maestro.
+# MAGIC Deberían salir WTG-0901 y WTG-0902, las dos turbinas que no existen en el maestro.
 
 # COMMAND ----------
 
@@ -169,7 +166,7 @@ display(spark.table(t(___)).groupBy("turbine_id").count())
 
 # MAGIC %md
 # MAGIC ## 6 · Gold: KPIs por parque y día
-# MAGIC Primero pasamos de una fila por señal a una columna por señal, que es como se analiza cómodo. Después calculamos la potencia teórica de cada minuto, la que daría el viento según el tamaño del rotor, para medir el rendimiento. Estos dos pasos van hechos.
+# MAGIC Primero pasamos de una fila por señal a una columna por señal, que es más cómodo para analizar. Después calculamos la potencia teórica de cada minuto (la que daría el viento según el tamaño del rotor) para medir el rendimiento. Estos dos pasos ya están hechos.
 
 # COMMAND ----------
 
@@ -199,7 +196,7 @@ display(spark.table(t("silver_telemetria_final")).limit(5))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Con eso ya se calculan los KPIs de cada turbina y día. La energía es la suma de la de cada minuto, el factor de capacidad compara lo producido con lo que habría dado la turbina a plena potencia todo el día y la disponibilidad mide cuánto produjo cuando había viento.
+# MAGIC Con eso ya se pueden calcular los KPIs de cada turbina y día. La energía es la suma de la de cada minuto. El factor de capacidad compara lo producido con lo que habría dado la turbina a plena potencia todo el día. La disponibilidad mide cuánto produjo cuando había viento.
 
 # COMMAND ----------
 
@@ -226,7 +223,7 @@ display(spark.table(t("gold_kpi_turbina_dia")).orderBy("fecha", "turbine_id").li
 # MAGIC ### Ahora tú
 # MAGIC Crea `gold_kpi_parque_dia` a partir de la Gold por turbina: por fecha y parque, el número de turbinas, la energía total y la media del factor de capacidad y de la disponibilidad.
 # MAGIC
-# MAGIC **Comprueba:** sale una fila por parque y día. P01 es el que más energía produce, porque tiene más turbinas.
+# MAGIC Sale una fila por parque y día. P01 es el que más energía produce porque tiene más turbinas.
 
 # COMMAND ----------
 
@@ -261,7 +258,7 @@ for col, txt in [("factor_capacidad", "Energía real / energía máxima a potenc
 # MAGIC ### Ahora tú
 # MAGIC Pon un comentario a la columna `energia_mwh` de `gold_kpi_parque_dia` y míralo en Catalog Explorer.
 # MAGIC
-# MAGIC **Comprueba:** en Catalog Explorer, en la pestaña Overview de la tabla, la columna lleva tu comentario.
+# MAGIC En la pestaña Overview de la tabla, en Catalog Explorer, la columna debería tener tu comentario.
 
 # COMMAND ----------
 
@@ -270,7 +267,7 @@ spark.sql(f"ALTER TABLE {t('gold_kpi_parque_dia')} ALTER COLUMN ___ COMMENT ___"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Para ir más allá (avanzado)
+# MAGIC ## Retos
 # MAGIC 1. Con `LAG`, calcula para cada lectura los minutos desde la anterior de la misma turbina y cuenta los huecos de más de 5 minutos por parque.
 # MAGIC 2. Guarda la historia del maestro como SCD tipo 2 en `dim_turbina_scd2`, con `valido_desde`, `valido_hasta` y `es_actual`, usando un MERGE.
 # MAGIC 3. Las 10 turbinas con peor rendimiento medio y vibración por encima del percentil 90.

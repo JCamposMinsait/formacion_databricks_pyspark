@@ -16,7 +16,7 @@ Requisito: tener `silver_telemetria` del lab 2.
 ## 2 · Tareas
 | Task key | Tipo | Qué | Depende de |
 |---|---|---|---|
-| `configurar` | Notebook | `01_configurar` | — |
+| `configurar` | Notebook | `01_configurar` | ninguna |
 | `procesar` | Notebook | `02_procesar` · Retries: 2, cada 1 min · Timeout: 20 min | `configurar` |
 | `hay_alertas` | If/else condition | `{{tasks.procesar.values.n_alertas}}` **>** `0` | `procesar` |
 | `alertar` | Notebook | `03_alertar` | `hay_alertas` (true) |
@@ -25,13 +25,13 @@ Requisito: tener `silver_telemetria` del lab 2.
 Cómputo: **Serverless** en todas.
 
 ## 3 · Notificaciones y disparador
-- *Job notifications* → On failure → vuestro email.
+- *Job notifications* → On failure, con vuestro email.
 - *Schedule & Triggers*: probad a crear un **Scheduled** (cron cada día a las 07:00) y dejadlo en **Paused**. Mirad también las opciones **File arrival** y **Table update**.
 
 ## 4 · Ejecutar
-1. **Run now**. En la ejecución: el grafo, la duración de cada tarea, la rama que ha tomado la condición y, en cada tarea, la pestaña de *task values*.
-2. **Run now with different parameters**: `zona = NORTE`, `umbral_temp = 90` → debería ir por `todo_ok`.
-3. Ahora `zona = TODAS`, `modo_estricto = true` → `alertar` falla a propósito. Os llega el email.
+1. **Run now**. En la ejecución mirad el grafo, la duración de cada tarea, la rama que ha tomado la condición y, en cada tarea, la pestaña de *task values*.
+2. **Run now with different parameters** con `zona = NORTE` y `umbral_temp = 90`. Debería ir por `todo_ok`.
+3. Ahora con `zona = TODAS` y `modo_estricto = true`. La tarea `alertar` falla a propósito y os llega el email.
 4. Cambiad el parámetro `modo_estricto` a `false` en la tarea y pulsad **Repair run**: solo se relanza lo fallado, no las tareas que fueron bien.
 
 ## 5 · Mirar el histórico con tablas de sistema (si tenéis permiso)
@@ -48,4 +48,4 @@ Menú `⋮` del job → **View as code** (YAML). Ese YAML es casi lo mismo que p
 ## Retos
 1. Añadid una tarea de tipo **Pipeline** que lance el pipeline del lab 4c antes de `procesar`.
 2. Convertid `procesar` en un **For each** que itere sobre la lista de parques (`{{tasks.configurar.values.parques}}`) y procese cada uno en paralelo.
-3. (Examen) ¿Diferencia entre parámetros de job y de tarea? ¿Qué pasa si los dos definen el mismo nombre?
+3. (Examen) ¿Qué diferencia hay entre los parámetros de job y los de tarea? ¿Qué pasa si los dos definen el mismo nombre?

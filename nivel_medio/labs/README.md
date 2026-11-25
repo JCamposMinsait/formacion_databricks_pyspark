@@ -27,7 +27,7 @@ labs/
 
 - Los alumnos trabajan en `alumno/`. Cada paso indica la slide del curso donde está explicado (por ejemplo, "Día 1 · Time travel: cada commit es una versión").
 - `soluciones/` tiene además resueltos los retos de todos los labs. En `alumno/` solo están los enunciados.
-- Recomendación: compartid `soluciones/` al terminar cada día, no antes.
+- Conviene compartir `soluciones/` al terminar cada día, no antes.
 
 ## Orden
 | Día | Notebook (en alumno/ y soluciones/) | Duración |

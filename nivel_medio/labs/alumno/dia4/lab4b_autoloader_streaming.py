@@ -1,15 +1,12 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 4b · Auto Loader y Structured Streaming (guía del alumno)
+# MAGIC # Lab 4b · Auto Loader y Structured Streaming
 # MAGIC
-# MAGIC **Duración:** ~35 min · Con el simulador (lab 4a) corriendo en otra pestaña.
+# MAGIC Duración: 35 min aproximadamente. Necesitas el simulador (lab 4a) corriendo en otra pestaña.
 # MAGIC
 # MAGIC > En Free Edition solo hay serverless, que solo admite `trigger(availableNow=True)`. El modo continuo con `processingTime` se ve en la teoría.
 # MAGIC
-# MAGIC > **Cómo usar esta guía**
-# MAGIC > - Cada paso tiene un objetivo, la slide del curso donde está explicado y unas pistas.
-# MAGIC > - Rellena lo marcado con `___` o `# TODO`. Si una celda no tiene nada que rellenar, léela y ejecútala.
-# MAGIC > - Si te atascas: primero la slide, luego la documentación de Databricks y, como último recurso, la solución en `labs/soluciones/`.
+# MAGIC Hay que completar lo marcado con `___` o `# TODO`. Cada paso indica la slide donde está explicado.
 
 # COMMAND ----------
 
@@ -25,13 +22,12 @@ def trigger_opts(w):
 
 # MAGIC %md
 # MAGIC ## 1 · COPY INTO
-# MAGIC **Objetivo:** cargar los ficheros del landing de forma idempotente con SQL.
+# MAGIC Carga los ficheros del landing con SQL, de forma idempotente.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 4 · Cuatro formas de llevar ficheros a una tabla · Auto Loader
-# MAGIC
-# MAGIC **Pistas**
 # MAGIC - Crea una tabla vacía con CREATE TABLE IF NOT EXISTS y luego COPY INTO con FILEFORMAT = JSON.
 # MAGIC - Ejecútalo dos veces: ¿cuántas filas inserta la segunda?
+# MAGIC
+# MAGIC Lo tienes en la slide Día 4 · Cuatro formas de llevar ficheros a una tabla · Auto Loader.
 
 # COMMAND ----------
 
@@ -49,14 +45,13 @@ COPY_OPTIONS ('mergeSchema' = 'true')
 
 # MAGIC %md
 # MAGIC ## 2 · Auto Loader a Bronze
-# MAGIC **Objetivo:** ingerir en streaming con evolución de esquema.
+# MAGIC Ahora la ingesta va en streaming y con evolución de esquema.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 4 · Auto Loader · Checkpoint: la memoria del stream · Triggers
-# MAGIC
-# MAGIC **Pistas**
 # MAGIC - Formato cloudFiles, con cloudFiles.format = json y cloudFiles.schemaLocation.
 # MAGIC - schemaEvolutionMode = addNewColumns: en la iteración 30 del simulador aparece una columna nueva y el stream se parará. Relánzalo.
 # MAGIC - Cada stream necesita su propio checkpointLocation.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 4 · Auto Loader · Checkpoint: la memoria del stream · Triggers.
 
 # COMMAND ----------
 
@@ -92,15 +87,14 @@ if SERVERLESS:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3 · Ventanas con watermark → Gold casi en tiempo real
-# MAGIC **Objetivo:** potencia media y temperatura máxima por turbina y minuto.
+# MAGIC ## 3 · Ventanas con watermark para una Gold casi en tiempo real
+# MAGIC Calcula la potencia media y la temperatura máxima por turbina y minuto.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 4 · Watermarks · Output modes
-# MAGIC
-# MAGIC **Pistas**
 # MAGIC - withWatermark("ts", "2 minutes") antes del groupBy.
 # MAGIC - Ventanas de 1 minuto con F.window("ts", "1 minute").
 # MAGIC - Output mode append: cada ventana se escribe una vez, cuando se cierra.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 4 · Watermarks · Output modes.
 
 # COMMAND ----------
 

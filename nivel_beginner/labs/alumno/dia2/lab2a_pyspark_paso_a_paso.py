@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 2a · PySpark paso a paso (guía del alumno)
+# MAGIC # Lab 2a · PySpark paso a paso
 # MAGIC
-# MAGIC **Duración:** ~1 h 15 min
+# MAGIC Duración: 1 h 15 min aproximadamente.
 # MAGIC
-# MAGIC Trabajas con la telemetría del lunes: ver, filtrar, crear columnas, limpiar nulos, agrupar, unir con el maestro y hacer lo mismo en SQL.
+# MAGIC Con la telemetría del lunes vamos a filtrar, crear columnas, limpiar nulos, agrupar y unir con el maestro. Al final hacemos lo mismo en SQL.
 # MAGIC
 # MAGIC | En SQL | En PySpark |
 # MAGIC |---|---|
@@ -16,10 +16,7 @@
 # MAGIC | `ORDER BY a DESC` | `df.orderBy(F.desc("a"))` |
 # MAGIC | `JOIN b USING (id)` | `df.join(b, "id")` |
 # MAGIC
-# MAGIC > **Cómo seguir esta guía**
-# MAGIC > - Va paso a paso: lee la explicación, ejecuta la celda y mira el resultado. El código de los pasos difíciles ya está escrito.
-# MAGIC > - En los ejercicios **Ahora tú** te toca escribir a ti: rellena lo marcado con `___`. Si te atascas, mira el código de justo encima.
-# MAGIC > - Los retos del final son para quien vaya rápido.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -29,7 +26,7 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Ver la telemetría
-# MAGIC Partimos de la Bronze. `ts` llega como texto, así que lo pasamos a fecha y hora nada más leer.
+# MAGIC Partimos de la tabla Bronze. La columna `ts` viene como texto y la convertimos a timestamp al leerla.
 
 # COMMAND ----------
 
@@ -43,7 +40,7 @@ display(lecturas.limit(10))
 # MAGIC ### Ahora tú
 # MAGIC Cuenta cuántas lecturas hay en total y cuántas turbinas distintas.
 # MAGIC
-# MAGIC **Comprueba:** unos 3,5 millones de lecturas y 242 turbinas: las 240 del maestro y dos que no existen.
+# MAGIC Deberían salir unos 3,5 millones de lecturas y 242 turbinas (dos de ellas no están en el maestro).
 
 # COMMAND ----------
 
@@ -54,7 +51,7 @@ print("Turbinas:", lecturas.select(___).distinct().count())
 
 # MAGIC %md
 # MAGIC ## 2 · Elegir columnas y filtrar
-# MAGIC Para combinar condiciones: `&` es y, `|` es o. Cada condición va entre paréntesis.
+# MAGIC Las condiciones se combinan con `&` (y) y `|` (o), cada una entre paréntesis.
 
 # COMMAND ----------
 
@@ -67,7 +64,7 @@ display(lecturas.filter((F.col("signal") == "power_kw") & (F.col("park_id") == "
 # MAGIC ### Ahora tú
 # MAGIC Las lecturas de temperatura de la multiplicadora (`temp_gearbox_c`) por encima de 80 ºC, con turbina, instante y valor.
 # MAGIC
-# MAGIC **Comprueba:** salen sobre todo WTG-0013 y WTG-0187, las dos que se calientan.
+# MAGIC Deberían salir sobre todo WTG-0013 y WTG-0187.
 
 # COMMAND ----------
 
@@ -93,7 +90,7 @@ display(potencia.select("turbine_id", "ts", "value", "potencia_mw", "estado").li
 # MAGIC ### Ahora tú
 # MAGIC Sobre las lecturas de viento (`wind_speed`), una columna `zona` que sea `CALMA` por debajo de 3 m/s, `CORTE` desde 25 m/s y `OPERABLE` en el resto.
 # MAGIC
-# MAGIC **Comprueba:** casi todas salen OPERABLE y unas pocas CALMA. CORTE no sale casi nunca.
+# MAGIC Casi todas son OPERABLE, hay algunas CALMA y CORTE casi no aparece.
 
 # COMMAND ----------
 
@@ -105,7 +102,7 @@ display(viento.groupBy("zona").count())
 
 # MAGIC %md
 # MAGIC ## 4 · Nulos y centinelas
-# MAGIC El `-9999` es un valor centinela: el sensor no tenía lectura. Se convierte en nulo para que no estropee medias ni sumas. `coalesce` devuelve el primer valor que no sea nulo.
+# MAGIC Cuando el sensor no tiene lectura envía `-9999`. Lo pasamos a nulo para que no altere medias ni sumas. `coalesce` devuelve el primer valor no nulo.
 
 # COMMAND ----------
 
@@ -119,7 +116,7 @@ display(limpio.select("value", F.coalesce("value", F.lit(0.0)).alias("value_o_ce
 # MAGIC ### Ahora tú
 # MAGIC Compara la media de `power_kw` con los `-9999` dentro y después de convertirlos en nulo.
 # MAGIC
-# MAGIC **Comprueba:** con los -9999 dentro la media sale más baja: unos pocos valores absurdos bastan para desviarla. Por eso se limpian.
+# MAGIC Con los -9999 dentro la media sale más baja.
 
 # COMMAND ----------
 
@@ -131,7 +128,7 @@ print(f"Con -9999: {sucia:.1f} kW | Sin -9999: {buena:.1f} kW")
 
 # MAGIC %md
 # MAGIC ## 5 · Agrupar
-# MAGIC `groupBy` dice por qué se agrupa y `agg` qué se calcula. `alias` le pone nombre al resultado.
+# MAGIC `groupBy` indica las columnas por las que se agrupa y `agg` lo que se calcula. Con `alias` se le da nombre al resultado.
 
 # COMMAND ----------
 
@@ -145,7 +142,7 @@ display(limpio.filter(F.col("signal") == "power_kw").groupBy("park_id")
 # MAGIC ### Ahora tú
 # MAGIC La temperatura máxima de la multiplicadora de cada turbina, de más a menos. Quédate con las 5 primeras.
 # MAGIC
-# MAGIC **Comprueba:** arriba salen WTG-0013 y WTG-0187.
+# MAGIC Arriba deberían salir WTG-0013 y WTG-0187.
 
 # COMMAND ----------
 
@@ -156,7 +153,7 @@ display(limpio.filter(F.col("signal") == "temp_gearbox_c").groupBy(___)
 
 # MAGIC %md
 # MAGIC ## 6 · Unir con el maestro
-# MAGIC El maestro tiene el modelo y el parque de cada turbina. Si la clave se llama igual en las dos tablas, se pasa su nombre como texto.
+# MAGIC El maestro tiene el modelo y el parque de cada turbina. Si la clave se llama igual en las dos tablas, basta con pasar su nombre.
 
 # COMMAND ----------
 
@@ -171,7 +168,7 @@ display(limpio.filter(F.col("signal") == "power_kw")
 # MAGIC ### Ahora tú
 # MAGIC La potencia media por modelo de turbina.
 # MAGIC
-# MAGIC **Comprueba:** salen los tres modelos. El que tiene más potencia nominal no tiene por qué salir el primero.
+# MAGIC Salen los tres modelos, y no tiene por qué ganar el de más potencia nominal.
 
 # COMMAND ----------
 
@@ -183,7 +180,7 @@ display(limpio.filter(F.col("signal") == "power_kw")
 
 # MAGIC %md
 # MAGIC ## 7 · Lo mismo en SQL
-# MAGIC Una vista temporal deja usar un DataFrame desde SQL. PySpark y SQL usan el mismo motor: se elige lo que mejor se lea.
+# MAGIC Con una vista temporal se puede consultar un DataFrame desde SQL. Por debajo el motor es el mismo, así que se usa el que resulte más claro.
 
 # COMMAND ----------
 
@@ -201,7 +198,7 @@ display(spark.sql("""
 # MAGIC ### Ahora tú
 # MAGIC En una celda `%sql`, la temperatura máxima por parque usando `lecturas_v`.
 # MAGIC
-# MAGIC **Comprueba:** sale una fila por parque. El que tiene WTG-0013 y WTG-0187 está arriba.
+# MAGIC Sale una fila por parque, con el de WTG-0013 y WTG-0187 arriba.
 
 # COMMAND ----------
 
@@ -216,7 +213,7 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Para ir más allá (avanzado)
+# MAGIC ## Retos
 # MAGIC 1. Las 5 turbinas con más horas de viento por encima de 12 m/s (cuenta minutos y divide entre 60).
 # MAGIC 2. Las lecturas de turbinas que no están en el maestro, con un `left_anti`.
 # MAGIC 3. La potencia media por hora del día de todo el parque P03. ¿A qué hora sopla más?

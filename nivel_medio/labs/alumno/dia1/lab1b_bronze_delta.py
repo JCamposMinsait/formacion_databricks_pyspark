@@ -1,15 +1,12 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 1b · Ingesta masiva de telemetría → Bronze + Delta Lake (guía del alumno)
+# MAGIC # Lab 1b · Ingesta masiva de telemetría en Bronze y Delta Lake
 # MAGIC
-# MAGIC **Duración:** ~1 h 15 min
+# MAGIC Duración: 1 h 15 min aproximadamente.
 # MAGIC
-# MAGIC Al terminar sabrás: cargar ficheros de un Volume a una tabla Bronze, ver cómo funciona Delta por dentro (log, ACID, esquema, time travel) y optimizar el layout de una tabla.
+# MAGIC Vamos a cargar ficheros de un Volume en una tabla Bronze, ver cómo funciona Delta por dentro (log, ACID, esquema, time travel) y optimizar el layout de una tabla.
 # MAGIC
-# MAGIC > **Cómo usar esta guía**
-# MAGIC > - Cada paso tiene un objetivo, la slide del curso donde está explicado y unas pistas.
-# MAGIC > - Rellena lo marcado con `___` o `# TODO`. Si una celda no tiene nada que rellenar, léela y ejecútala.
-# MAGIC > - Si te atascas: primero la slide, luego la documentación de Databricks y, como último recurso, la solución en `labs/soluciones/`.
+# MAGIC En las celdas hay que completar lo que está marcado con `___` o `# TODO`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -19,13 +16,11 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Generar la telemetría cruda
-# MAGIC **Objetivo:** tener ~12 M de lecturas JSON en el Volume, como las dejaría un concentrador.
+# MAGIC Generamos las lecturas y las guardamos como JSON en el Volume, igual que haría un concentrador. Con `DIAS = 2` salen unos 3,5 millones. Se deja en 2 para no agotar la cuota diaria de cómputo de Free Edition.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · Telemetría de aerogeneradores
+# MAGIC En esta celda no hay que escribir nada, solo leer el código y ejecutarlo.
 # MAGIC
-# MAGIC **Pistas**
-# MAGIC - No tienes que escribir nada: lee el código y ejecútalo.
-# MAGIC - DIAS viene en 2 para no agotar la cuota diaria de cómputo de Free Edition.
+# MAGIC Lo tienes en la slide Día 1 · Telemetría de aerogeneradores.
 
 # COMMAND ----------
 
@@ -97,13 +92,11 @@ display(dbutils.fs.ls(RUTA_RAW_BATCH))
 
 # MAGIC %md
 # MAGIC ## 2 · Explorar los ficheros sin cargarlos
-# MAGIC **Objetivo:** mirar qué hay antes de crear ninguna tabla.
+# MAGIC Antes de crear ninguna tabla, mira qué hay en los ficheros.
+# MAGIC - `read_files` lee una carpeta y descubre el esquema y las particiones.
+# MAGIC - `count_if(condición)` cuenta las filas que cumplen la condición.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · Qué formato usar para cada cosa · Qué es Delta Lake
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - read_files lee una carpeta y descubre el esquema y las particiones.
-# MAGIC - count_if(condición) cuenta las filas que cumplen algo.
+# MAGIC Lo tienes en las slides Día 1 · Qué formato usar para cada cosa · Qué es Delta Lake.
 
 # COMMAND ----------
 
@@ -129,15 +122,13 @@ display(spark.sql(f"""
 
 # MAGIC %md
 # MAGIC ## 3 · Crear la tabla Bronze
-# MAGIC **Objetivo:** cargar los ficheros tal cual llegan, con dos columnas de auditoría.
+# MAGIC Cargamos los ficheros tal cual llegan y añadimos dos columnas de auditoría.
+# MAGIC - El esquema se fija a mano. En producción no conviene fiarse de la inferencia.
+# MAGIC - La ruta del fichero de origen está en la columna oculta `_metadata.file_path`.
+# MAGIC - La fecha de carga sale de `F.current_timestamp()`.
+# MAGIC - La tabla se escribe con `saveAsTable(t("bronze_telemetria"))`.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · Una tabla Delta es Parquet más un diario · Escribir en Delta: qué comando para qué
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - Esquema explícito: nada de inferir en producción.
-# MAGIC - La ruta del fichero de origen está en la columna oculta _metadata.file_path.
-# MAGIC - La fecha de carga: F.current_timestamp().
-# MAGIC - Escribe con saveAsTable(t("bronze_telemetria")).
+# MAGIC Lo tienes en las slides Día 1 · Una tabla Delta es Parquet más un diario · Escribir en Delta: qué comando para qué.
 
 # COMMAND ----------
 
@@ -173,13 +164,11 @@ print(spark.table(t("bronze_telemetria")).count(), "filas en bronze")
 
 # MAGIC %md
 # MAGIC ## 4 · ACID y control de esquema
-# MAGIC **Objetivo:** ver que cada operación es un commit y que Delta protege el esquema.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 1 · ACID, traducido a ficheros · Enforcement y evolution del esquema
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - UPDATE y DELETE funcionan como en cualquier base de datos.
+# MAGIC Vas a ver que cada operación es un commit y que Delta protege el esquema.
+# MAGIC - `UPDATE` y `DELETE` funcionan como en cualquier base de datos.
 # MAGIC - Después de cada operación, vuelve a mirar el historial.
+# MAGIC
+# MAGIC Lo tienes en las slides Día 1 · ACID, traducido a ficheros · Enforcement y evolution del esquema.
 
 # COMMAND ----------
 
@@ -223,13 +212,11 @@ spark.table(t("bronze_telemetria")).printSchema()   # ¿aparece la columna regio
 
 # MAGIC %md
 # MAGIC ## 5 · Time travel y RESTORE
-# MAGIC **Objetivo:** consultar versiones anteriores y deshacer cambios.
+# MAGIC Consultamos versiones anteriores de la tabla y deshacemos cambios.
+# MAGIC - Una versión se lee con `VERSION AS OF n` o con `TIMESTAMP AS OF 'fecha'`.
+# MAGIC - `EXCEPT ALL` devuelve las filas que están en la primera consulta y no en la segunda.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · Time travel: cada commit es una versión
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - VERSION AS OF n o TIMESTAMP AS OF 'fecha'.
-# MAGIC - EXCEPT ALL devuelve las filas que están en la primera consulta y no en la segunda.
+# MAGIC Lo tienes en la slide Día 1 · Time travel: cada commit es una versión.
 
 # COMMAND ----------
 
@@ -259,14 +246,12 @@ spark.table(t("bronze_telemetria")).printSchema()   # ¿aparece la columna regio
 
 # MAGIC %md
 # MAGIC ## 6 · Layout: OPTIMIZE, Z-ORDER y Liquid Clustering
-# MAGIC **Objetivo:** medir cuántos ficheros lee una consulta según cómo estén ordenados los datos.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 1 · El problema de los ficheros pequeños · Ordenar los datos para leer menos
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - Crea dos copias de la tabla: una con Z-ORDER y otra con Liquid Clustering, las dos por (turbine_id, ts).
+# MAGIC Vamos a medir cuántos ficheros lee una consulta según cómo estén ordenados los datos.
+# MAGIC - Crea dos copias de la tabla, una con Z-ORDER y otra con Liquid Clustering, las dos por (turbine_id, ts).
 # MAGIC - Compara files read y files pruned en el Query Profile (enlace See performance bajo el resultado).
 # MAGIC - A las copias les ponemos un tamaño de fichero objetivo pequeño (32 MB) para que tengan bastantes ficheros y se note la diferencia. En producción esto no se toca.
+# MAGIC
+# MAGIC Lo tienes en las slides Día 1 · El problema de los ficheros pequeños · Ordenar los datos para leer menos.
 
 # COMMAND ----------
 
@@ -312,9 +297,9 @@ spark.table(t("bronze_telemetria")).printSchema()   # ¿aparece la columna regio
 
 # MAGIC %md
 # MAGIC ## 7 · VACUUM
-# MAGIC **Objetivo:** ver qué ficheros borraría VACUUM sin borrarlos.
+# MAGIC Vamos a ver qué ficheros borraría VACUUM, sin llegar a borrarlos.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · VACUUM y la retención
+# MAGIC Lo tienes en la slide Día 1 · VACUUM y la retención.
 
 # COMMAND ----------
 
@@ -325,18 +310,18 @@ spark.table(t("bronze_telemetria")).printSchema()   # ¿aparece la columna regio
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Pregunta:** ¿por qué no borra nada? ¿Qué pasaría con el time travel si VACUUM borrase los ficheros de la versión 0?
+# MAGIC Piensa por qué no borra nada y qué pasaría con el time travel si VACUUM borrase los ficheros de la versión 0.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 8 · Managed y external
 # MAGIC
-# MAGIC > En Free Edition no se pueden crear external locations, así que la parte external se queda en la teoría. Haced la parte managed.
+# MAGIC > En Free Edition no se pueden crear external locations, así que la parte external se queda en la teoría. Aquí haz solo la parte managed.
 # MAGIC
-# MAGIC **Objetivo:** ver de qué tipo son tus tablas.
+# MAGIC Mira de qué tipo son tus tablas.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 1 · Tablas managed y external
+# MAGIC Lo tienes en la slide Día 1 · Tablas managed y external.
 
 # COMMAND ----------
 
@@ -353,7 +338,7 @@ spark.table(t("bronze_telemetria")).printSchema()   # ¿aparece la columna regio
 # MAGIC 1. ¿Cuántas filas duplicadas exactas hay en Bronze? (pista: `GROUP BY ALL HAVING count(*) > 1`).
 # MAGIC 2. Consulta la tabla tal y como estaba al crearla con `TIMESTAMP AS OF`. La hora de la versión 0 sale en `DESCRIBE HISTORY`.
 # MAGIC 3. Crea `bronze_telemetria_auto` con `CLUSTER BY AUTO` y mira `DESCRIBE DETAIL`.
-# MAGIC 4. Activa el Change Data Feed en Bronze, haz un `UPDATE` y léelo con `table_changes()`. Ojo: desde qué versión.
+# MAGIC 4. Activa el Change Data Feed en Bronze, haz un `UPDATE` y léelo con `table_changes()`. Fíjate bien en desde qué versión lo lees.
 # MAGIC 5. (Examen) ¿Qué pasa si haces `VACUUM` con `RETAIN 0 HOURS` y luego intentas `VERSION AS OF 1`?
 # MAGIC
 # MAGIC ## Reto extra · Recuperación quirúrgica

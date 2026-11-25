@@ -1,17 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 2a · Secretos, maestros, PySpark y Silver (guía del alumno)
+# MAGIC # Lab 2a · Secretos, maestros, PySpark y Silver
 # MAGIC
-# MAGIC **Duración:** ~1 h 30 min
+# MAGIC Duración: 1 h 30 min aproximadamente.
 # MAGIC
-# MAGIC Al terminar sabrás guardar y leer un secreto sin escribirlo en el código y construir una tabla Silver limpia y cruzada con los maestros.
+# MAGIC Vamos a guardar y leer un secreto sin escribirlo en el código y a construir una tabla Silver limpia y cruzada con los maestros.
 # MAGIC
 # MAGIC > En una empresa, los maestros vendrían de una base de datos por JDBC o con Lakehouse Federation. En Free Edition no se puede llegar a bases de datos de fuera, así que esa parte se ve en la teoría.
 # MAGIC
-# MAGIC > **Cómo usar esta guía**
-# MAGIC > - Cada paso tiene un objetivo, la slide del curso donde está explicado y unas pistas.
-# MAGIC > - Rellena lo marcado con `___` o `# TODO`. Si una celda no tiene nada que rellenar, léela y ejecútala.
-# MAGIC > - Si te atascas: primero la slide, luego la documentación de Databricks y, como último recurso, la solución.
+# MAGIC En las celdas hay que completar lo que está marcado con `___` o `# TODO`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -21,13 +18,11 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Secretos
-# MAGIC **Objetivo:** guardar una contraseña en un secret scope y leerla sin que aparezca en el código.
-# MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Secretos: ninguna contraseña en el código
-# MAGIC
-# MAGIC **Pistas**
+# MAGIC Guardamos una contraseña en un secret scope y la leemos sin que aparezca en el código.
 # MAGIC - Ejecuta la primera celda, escribe cualquier texto en el cuadro que aparece arriba y ejecuta la segunda.
 # MAGIC - `dbutils.secrets.list(scope)` enseña los nombres y `dbutils.secrets.get(scope, clave)` lee un valor.
+# MAGIC
+# MAGIC Lo tienes en la slide Día 2 · Secretos: ninguna contraseña en el código.
 
 # COMMAND ----------
 
@@ -54,7 +49,7 @@ print("La contraseña es:", pwd)            # ¿qué se imprime?
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Así quedaría la lectura de los maestros en una empresa, con las credenciales sacadas del scope. En Free Edition no se puede ejecutar, pero es exactamente lo que haríais en vuestro trabajo:
+# MAGIC Así se leerían los maestros en una empresa, con las credenciales sacadas del scope. En Free Edition no se puede ejecutar.
 # MAGIC ```python
 # MAGIC turbinas = (spark.read.format("jdbc")
 # MAGIC     .option("url", "jdbc:postgresql://<host>:5432/activos")
@@ -80,12 +75,9 @@ display(turbinas.limit(5))
 
 # MAGIC %md
 # MAGIC ## 3 · Narrow y wide
-# MAGIC **Objetivo:** distinguir en el plan qué provoca un shuffle.
+# MAGIC Vamos a ver qué operaciones provocan un shuffle. En el plan, el shuffle aparece como Exchange.
 # MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Transformaciones narrow y wide · Catalyst
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - En el plan, un shuffle aparece como Exchange.
+# MAGIC Lo tienes en las slides Día 2 · Transformaciones narrow y wide · Catalyst.
 
 # COMMAND ----------
 
@@ -104,14 +96,12 @@ wide.explain()       # ¿dónde aparece el Exchange?
 
 # MAGIC %md
 # MAGIC ## 4 · Silver: limpiar, deduplicar, tipar y enriquecer
-# MAGIC **Objetivo:** construir silver_telemetria, la dimensión de turbinas y la cuarentena.
+# MAGIC Construimos `silver_telemetria`, la dimensión de turbinas y la cuarentena.
+# MAGIC - Las reglas son: `ts` a timestamp, `-9999` a nulo, potencias negativas a 0 y fuera los duplicados por (turbine_id, ts, signal).
+# MAGIC - El maestro es pequeño, así que usa `F.broadcast`.
+# MAGIC - Las lecturas de turbinas que no están en el maestro van a `silver_cuarentena` (con un `left_anti`, o con un left join y filtrando los nulos).
 # MAGIC
-# MAGIC **Slide de referencia:** Día 2 · Transformaciones del día a día · Tipos de join · Cómo ejecuta Spark un join
-# MAGIC
-# MAGIC **Pistas**
-# MAGIC - Reglas: ts a timestamp · -9999 a nulo · potencias negativas a 0 · fuera duplicados por (turbine_id, ts, signal).
-# MAGIC - El maestro es pequeño: usa F.broadcast.
-# MAGIC - Las lecturas de turbinas que no están en el maestro van a silver_cuarentena (left_anti o un left join y filtrar nulos).
+# MAGIC Lo tienes en las slides Día 2 · Transformaciones del día a día · Tipos de join · Cómo ejecuta Spark un join.
 
 # COMMAND ----------
 

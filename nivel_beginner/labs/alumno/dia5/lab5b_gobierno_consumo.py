@@ -1,17 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 5b · Gobierno y consumo (guía del alumno)
+# MAGIC # Lab 5b · Gobierno y consumo
 # MAGIC
-# MAGIC **Duración:** ~1 h
+# MAGIC Duración: 1 h aproximadamente.
 # MAGIC
-# MAGIC Das permisos sobre tu Gold, miras de dónde sale cada dato y la pones en manos del negocio con un dashboard y un Genie space.
+# MAGIC Vamos a dar permisos sobre la Gold, ver de dónde sale cada dato y dejarla lista para negocio con un dashboard y un Genie space.
 # MAGIC
 # MAGIC > Necesitas las tablas Gold del lab 3. Si no las tienes, ejecuta `00_setup/ponerse_al_dia` eligiendo el día 5.
 # MAGIC
-# MAGIC > **Cómo seguir esta guía**
-# MAGIC > - Va paso a paso: lee la explicación, ejecuta la celda y mira el resultado. El código de los pasos difíciles ya está escrito.
-# MAGIC > - En los ejercicios **Ahora tú** te toca escribir a ti: rellena lo marcado con `___`. Si te atascas, mira el código de justo encima.
-# MAGIC > - Los retos del final son para quien vaya rápido.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -41,7 +38,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
 # MAGIC ### Ahora tú
 # MAGIC Quita el SELECT que acabas de dar y vuelve a mirar los permisos de la tabla.
 # MAGIC
-# MAGIC **Comprueba:** el SELECT de account users ya no aparece.
+# MAGIC El SELECT de account users ya no debería aparecer.
 
 # COMMAND ----------
 
@@ -52,7 +49,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
 
 # MAGIC %md
 # MAGIC ## 2 · Linaje
-# MAGIC Abre `gold_kpi_parque_dia` en Catalog Explorer y entra en la pestaña **Lineage**: se ve de qué tablas sale, hasta la Bronze, sin haber hecho nada. Lo mismo se puede consultar en las tablas de sistema, si están en tu cuenta.
+# MAGIC Abre `gold_kpi_parque_dia` en Catalog Explorer y entra en la pestaña **Lineage**. Ahí se ve de qué tablas sale, hasta la Bronze, sin haber configurado nada. Lo mismo se puede consultar en las tablas de sistema si tu cuenta las tiene.
 
 # COMMAND ----------
 
@@ -91,7 +88,7 @@ for nombre, consulta in DATASETS.items():
 # MAGIC ### Ahora tú
 # MAGIC Escribe un tercer dataset con la energía total de cada día, sumando todos los parques, y pruébalo aquí antes de llevarlo al dashboard.
 # MAGIC
-# MAGIC **Comprueba:** salen dos filas, una por día, con la energía total del conjunto de parques.
+# MAGIC Deberían salir dos filas, una por día, con la energía total de todos los parques.
 
 # COMMAND ----------
 
@@ -128,7 +125,7 @@ INSTRUCCIONES
 # MAGIC ### Ahora tú
 # MAGIC Escribe la consulta SQL que debería generar Genie para la pregunta *¿Cuántas turbinas a revisar hay en cada parque el último día?* y compárala con la que genera.
 # MAGIC
-# MAGIC **Comprueba:** salen los parques con turbinas a revisar. En los parques de las turbinas degradadas (WTG-0042, WTG-0117 y WTG-0199) sale al menos una.
+# MAGIC Deberían salir los parques con turbinas a revisar, con al menos una en los parques de las turbinas degradadas (WTG-0042, WTG-0117 y WTG-0199).
 
 # COMMAND ----------
 
@@ -141,7 +138,7 @@ GROUP BY ___"""))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Para ir más allá (avanzado)
+# MAGIC ## Retos
 # MAGIC 1. Un filtro de filas: crea una tabla de permisos `permisos_operador` (usuario, operador) y una función que solo deje ver los parques de tus operadores. Aplícala a una copia de `gold_kpi_parque_dia` con el operador de cada parque.
 # MAGIC 2. Una máscara que redondee las coordenadas de los parques salvo para quien tenga permiso.
 # MAGIC 3. Con el filtro puesto, pregúntale a Genie por *Costa da Morte* sobre esa tabla. ¿Por qué no sale nada?

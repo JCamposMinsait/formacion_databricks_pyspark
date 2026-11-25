@@ -34,17 +34,17 @@ databricks bundle run telemetria_job -t dev -p curso
 databricks bundle summary -t dev -p curso
 ```
 
-En dev, el pipeline lee del mismo landing en el que escribe el simulador del lab 4a (`/Volumes/formacion/eolica_<usuario>/landing/telemetria_stream`), así que si quedan ficheros del jueves no hay que copiar nada. Si no queda ninguno, arrancad el simulador unos minutos.
+En dev, el pipeline lee del mismo landing en el que escribe el simulador del lab 4a (`/Volumes/formacion/eolica_<usuario>/landing/telemetria_stream`), así que si quedan ficheros del jueves no hay que copiar nada. Si no queda ninguno, arranca el simulador unos minutos.
 
-Las tablas se crean en un esquema aparte, `eolica_<usuario>_bundle`, para no chocar con las de los labs. Si la ruta del landing no coincide con la vuestra (pasa con algunos nombres de usuario), cambiad `ruta_landing` en el target `dev`.
+Las tablas se crean en un esquema aparte, `eolica_<usuario>_bundle`, para no chocar con las de los labs. Si la ruta del landing no coincide con la tuya (pasa con algunos nombres de usuario), cambia `ruta_landing` en el target `dev`.
 
 ## Producción
-- El target `prod` lleva `run_as` con un **Service Principal**: los jobs se ejecutan con su identidad, no con la de quien despliega.
-- Solo la CI despliega a prod (`.github/workflows/deploy.yml`). Las personas, como mucho, `validate`.
+- El target `prod` lleva `run_as` con un **Service Principal**, así que los jobs se ejecutan con su identidad y no con la de quien despliega.
+- Solo la CI despliega a prod (`.github/workflows/deploy.yml`). Las personas, como mucho, lanzan `validate`.
 - Para destruir lo desplegado en dev: `databricks bundle destroy -t dev`.
 
 ## En Free Edition
 - Si `databricks auth login` falla, genera un token en Settings → Developer → Access tokens y configura la CLI con `databricks configure --host <url de tu workspace> --profile curso`.
-- Antes de desplegar, parad o borrad el pipeline del lab 4c, porque en Free Edition solo puede haber un pipeline activo.
-- En `databricks.yml`, poned en `host` la URL de vuestro workspace y, si vuestro catálogo no es `formacion`, cambiadlo en `catalogo` y en `ruta_landing`.
+- Antes de desplegar, para o borra el pipeline del lab 4c, porque en Free Edition solo puede haber un pipeline activo.
+- En `databricks.yml`, pon en `host` la URL de tu workspace y, si tu catálogo no es `formacion`, cámbialo en `catalogo` y en `ruta_landing`.
 - El target `prod` y el workflow de GitHub necesitan un Service Principal, que en Free Edition no existe. Se leen y se explican, pero no se ejecutan.

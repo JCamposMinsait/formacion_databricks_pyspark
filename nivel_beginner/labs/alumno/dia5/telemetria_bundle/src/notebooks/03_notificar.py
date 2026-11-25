@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC ### Tarea 5 · Notificar a mantenimiento (solo se ejecuta si hay alertas)
-# MAGIC Aquí iría la llamada al GMAO / Teams / ServiceNow. Para el curso, pintamos la lista.
+# MAGIC Aquí iría la llamada al GMAO, a Teams o a ServiceNow. En el curso solo mostramos la lista.
 
 # COMMAND ----------
 

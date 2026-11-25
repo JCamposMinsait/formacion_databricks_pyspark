@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 1a · Puesta a punto de PySpark (guía del alumno)
+# MAGIC # Lab 1a · Puesta a punto de PySpark
 # MAGIC
-# MAGIC **Duración:** ~45 min
+# MAGIC Duración: 45 min aproximadamente.
 # MAGIC
-# MAGIC PySpark es la forma de escribir en Python lo mismo que haríais en SQL. Si sabéis SQL, ya sabéis casi todo: lo que cambia es cómo se escribe. Cada paso trae un ejemplo resuelto y un ejercicio parecido para que lo hagáis vosotros.
+# MAGIC Con PySpark escribes en Python lo mismo que harías en SQL. Si sabes SQL ya tienes casi todo, solo cambia la forma de escribirlo. Cada paso tiene un ejemplo resuelto y un ejercicio parecido.
 # MAGIC
 # MAGIC | En SQL | En PySpark |
 # MAGIC |---|---|
@@ -18,7 +18,7 @@
 # MAGIC
 # MAGIC > `F` son las funciones de Spark (`from pyspark.sql import functions as F`). Ya vienen importadas en la configuración.
 # MAGIC
-# MAGIC > **Cómo usar esta guía:** ejecuta los ejemplos, léelos y rellena lo marcado con `___` en los ejercicios. Si te atascas, mira el ejemplo de justo encima.
+# MAGIC En los **ejercicios** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -53,7 +53,7 @@ print("Filas:", turbinas.___())
 
 # MAGIC %md
 # MAGIC ## 2 · Elegir columnas y filtrar (SELECT y WHERE)
-# MAGIC Para combinar condiciones: `&` es *y*, `|` es *o* y `~` es *no*. Cada condición va entre paréntesis.
+# MAGIC Las condiciones se combinan con `&` (y), `|` (o) y `~` (no), cada una entre paréntesis.
 
 # COMMAND ----------
 
@@ -98,7 +98,7 @@ display(turbinas
 
 # MAGIC %md
 # MAGIC ## 4 · Agrupar (GROUP BY)
-# MAGIC `groupBy` dice por qué columnas se agrupa y `agg` qué se calcula. `alias` le pone nombre al resultado, como el `AS` de SQL.
+# MAGIC `groupBy` indica las columnas por las que se agrupa y `agg` lo que se calcula. Con `alias` se le da nombre al resultado, igual que con el `AS` de SQL.
 
 # COMMAND ----------
 
@@ -121,7 +121,7 @@ display(turbinas.groupBy(___)
 
 # MAGIC %md
 # MAGIC ## 5 · Unir tablas (JOIN)
-# MAGIC Si la clave se llama igual en las dos tablas, se pasa su nombre como texto y no sale repetida. Para un `LEFT JOIN`, se añade `"left"` como tercer argumento.
+# MAGIC Si la clave se llama igual en las dos tablas, basta con pasar su nombre y no sale repetida. Para un `LEFT JOIN` se añade `"left"` como tercer argumento.
 
 # COMMAND ----------
 
@@ -142,7 +142,7 @@ display(turbinas.join(parques, ___)
 
 # MAGIC %md
 # MAGIC ## 6 · Lecturas de sensores
-# MAGIC Unas lecturas inventadas: 10 turbinas, un día, una lectura por minuto, con viento y temperatura de la multiplicadora.
+# MAGIC Generamos lecturas de prueba de 10 turbinas durante un día, una por minuto, con el viento y la temperatura de la multiplicadora.
 
 # COMMAND ----------
 
@@ -159,7 +159,7 @@ display(lecturas.groupBy("turbine_id").agg(F.max("temp_c").alias("temp_max")).or
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Ejercicio:** por parque, el viento medio y la temperatura máxima, contando solo los minutos con viento de 3 m/s o más, ordenado de más a menos temperatura. Pista: las lecturas no tienen el parque, hay que unirlas con las turbinas.
+# MAGIC **Ejercicio:** por parque, el viento medio y la temperatura máxima, contando solo los minutos con viento de 3 m/s o más, ordenado de más a menos temperatura. Las lecturas no traen el parque, así que hay que unirlas con las turbinas.
 
 # COMMAND ----------
 
@@ -173,7 +173,7 @@ display(lecturas.filter(___)
 
 # MAGIC %md
 # MAGIC ## 7 · Lo mismo en SQL
-# MAGIC Una vista temporal deja usar un DataFrame desde SQL, con `spark.sql` o en una celda `%sql`. PySpark y SQL usan el mismo motor: elegid lo que mejor se lea.
+# MAGIC Con una vista temporal se puede consultar un DataFrame desde SQL, con `spark.sql` o en una celda `%sql`. Por debajo el motor es el mismo, así que usa el que te resulte más claro.
 
 # COMMAND ----------
 
@@ -205,7 +205,7 @@ display(spark.sql("""
 
 # MAGIC %md
 # MAGIC ## 8 · Guardar y leer una tabla
-# MAGIC `saveAsTable` guarda el DataFrame como tabla en vuestro esquema, en formato Delta, y `spark.table` la lee. Buscadla después en Catalog Explorer. Delta lo vemos a fondo en el lab 1b.
+# MAGIC `saveAsTable` guarda el DataFrame como tabla Delta en tu esquema y `spark.table` la lee. Luego puedes buscarla en Catalog Explorer. Delta lo vemos a fondo en el lab 1b.
 
 # COMMAND ----------
 
@@ -218,7 +218,7 @@ display(spark.table(t("pyspark_resumen_parques")))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Retos (para quien vaya rápido)
-# MAGIC 1. Las 5 turbinas con más horas de viento por encima de 12 m/s. Pista: cuenta los minutos y divide entre 60.
+# MAGIC ## Retos
+# MAGIC 1. Las 5 turbinas con más horas de viento por encima de 12 m/s (cuenta los minutos y divide entre 60).
 # MAGIC 2. ¿Cuántos parques tiene cada operador? Hazlo en PySpark y en SQL.
 # MAGIC 3. Añade a las lecturas una columna `alerta`: `ALTA` si la temperatura pasa de 80, `MEDIA` si pasa de 70 y `NORMAL` en el resto. Cuenta cuántas hay de cada una.

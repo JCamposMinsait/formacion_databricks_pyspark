@@ -4,7 +4,7 @@
 # MAGIC Lee de la tarea `configurar` qué parques revisar y calcula la temperatura máxima de multiplicadora
 # MAGIC por turbina en el último día con datos. Las que superan el umbral van a una tabla de alertas.
 # MAGIC
-# MAGIC `debugValue` es lo que devuelve `taskValues.get` cuando ejecutáis el notebook a mano, fuera de un job.
+# MAGIC `debugValue` es lo que devuelve `taskValues.get` cuando ejecutas el notebook a mano, fuera de un job.
 
 # COMMAND ----------
 

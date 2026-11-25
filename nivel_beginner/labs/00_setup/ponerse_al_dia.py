@@ -11,7 +11,7 @@
 # MAGIC | 4 o 5 | lo anterior más `dim_turbina_scd2`, la función `fn_potencia_teorica` y las tablas Gold |
 # MAGIC
 # MAGIC Es el mismo código que las soluciones de los labs, sin los ejercicios intermedios. Los maestros salen del notebook de configuración, no de la Postgres.
-# MAGIC En serverless tarda entre 5 y 20 minutos según el día. Si va justo, baja los días de telemetría.
+# MAGIC En serverless tarda entre 5 y 20 minutos según el día. Si vas justo de cuota, baja los días de telemetría.
 
 # COMMAND ----------
 

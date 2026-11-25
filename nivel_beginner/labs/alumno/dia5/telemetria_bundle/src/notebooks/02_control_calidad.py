@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC ### Tarea 3 · Control de calidad + alertas
+# MAGIC ### Tarea 3 · Control de calidad y alertas
 # MAGIC Publica un *task value* (`alertas`) que usa la `condition_task` siguiente para decidir si notifica.
-# MAGIC Mira la última hora **con datos**, no la hora actual: así funciona igual con el simulador en marcha que con ficheros de otro día.
+# MAGIC Mira la última hora **con datos**, no la hora actual. Así funciona igual con el simulador en marcha que con ficheros de otro día.
 
 # COMMAND ----------
 

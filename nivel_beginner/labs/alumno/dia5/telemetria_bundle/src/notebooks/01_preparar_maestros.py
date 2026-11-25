@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC ### Tarea 1 · Foto del maestro de turbinas
-# MAGIC En un caso real: lectura JDBC / Lakeflow Connect desde el ERP. Aquí lo generamos para que el bundle sea autocontenido.
+# MAGIC En un caso real se leería del ERP con JDBC o Lakeflow Connect. Aquí lo generamos para que el bundle no dependa de nada externo.
 
 # COMMAND ----------
 

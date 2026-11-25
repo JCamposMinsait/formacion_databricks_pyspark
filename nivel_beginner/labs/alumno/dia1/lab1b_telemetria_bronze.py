@@ -1,17 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 1b · La telemetría y la tabla Bronze (guía del alumno)
+# MAGIC # Lab 1b · La telemetría y la tabla Bronze
 # MAGIC
-# MAGIC **Duración:** ~1 h
+# MAGIC Duración: 1 h aproximadamente.
 # MAGIC
-# MAGIC Generas la telemetría de la semana, la exploras sin cargarla y la guardas en la tabla **Bronze**, de la que parte todo lo demás.
+# MAGIC Vamos a generar la telemetría de la semana, explorarla sin cargarla y guardarla en la tabla **Bronze**, que es la base de todo lo demás.
 # MAGIC
-# MAGIC > Lo mínimo que tienes que acabar hoy es la tabla `bronze_telemetria`: mañana se parte de ella.
+# MAGIC > Hoy hay que terminar al menos la tabla `bronze_telemetria`, porque mañana partimos de ella.
 # MAGIC
-# MAGIC > **Cómo seguir esta guía**
-# MAGIC > - Va paso a paso: lee la explicación, ejecuta la celda y mira el resultado. El código de los pasos difíciles ya está escrito.
-# MAGIC > - En los ejercicios **Ahora tú** te toca escribir a ti: rellena lo marcado con `___`. Si te atascas, mira el código de justo encima.
-# MAGIC > - Los retos del final son para quien vaya rápido.
+# MAGIC En las celdas de **Ahora tú** hay que completar lo que está marcado con `___`. Los retos del final son opcionales.
 
 # COMMAND ----------
 
@@ -21,9 +18,9 @@
 
 # MAGIC %md
 # MAGIC ## 1 · Generar la telemetría
-# MAGIC Esta celda hace de concentrador de los parques: escribe ficheros JSON con una lectura por turbina, minuto y señal (formato EAV). Vienen sucios a propósito: valores `-9999` cuando el sensor no tiene lectura, nulos, duplicados, lecturas de calidad `BAD` y turbinas que no existen en el maestro.
+# MAGIC Esta celda hace de concentrador de los parques. Escribe ficheros JSON con una lectura por turbina, minuto y señal (formato EAV). Los datos vienen sucios a propósito, con valores `-9999` cuando el sensor no tiene lectura, nulos, duplicados, lecturas de calidad `BAD` y turbinas que no existen en el maestro.
 # MAGIC
-# MAGIC Con `dias = 2` salen unos 3,5 millones de filas. No lo subas: la cuenta gratuita tiene una cuota diaria de cómputo.
+# MAGIC Con `dias = 2` salen unos 3,5 millones de filas. No subas el valor, que la cuenta gratuita tiene una cuota diaria de cómputo.
 
 # COMMAND ----------
 
@@ -71,7 +68,7 @@ print("Telemetría escrita en", RUTA_RAW_BATCH)
 
 # MAGIC %md
 # MAGIC ## 2 · Explorar los ficheros sin cargarlos
-# MAGIC Antes de crear una tabla conviene mirar qué ha llegado. `read_files` deja consultar ficheros con SQL directamente.
+# MAGIC Antes de crear una tabla conviene mirar qué ha llegado. Con `read_files` se pueden consultar los ficheros directamente desde SQL.
 
 # COMMAND ----------
 
@@ -84,7 +81,7 @@ display(spark.sql(f"SELECT * FROM read_files('{RUTA_RAW_BATCH}', format => 'json
 # MAGIC ### Ahora tú
 # MAGIC Cuenta cuántas lecturas hay de cada señal directamente sobre los ficheros.
 # MAGIC
-# MAGIC **Comprueba:** salen las cinco señales con cifras muy parecidas, alrededor de 700.000 cada una.
+# MAGIC Deberían salir las cinco señales con cifras muy parecidas, alrededor de 700.000 cada una.
 
 # COMMAND ----------
 
@@ -94,7 +91,7 @@ display(spark.sql(f"SELECT signal, count(*) AS lecturas FROM read_files('{RUTA_R
 
 # MAGIC %md
 # MAGIC ## 3 · La tabla Bronze
-# MAGIC En Bronze se guarda el dato tal cual llega, sin limpiar, más dos columnas de auditoría: de qué fichero viene cada fila y cuándo se cargó. El esquema se da escrito, que es lo correcto en producción.
+# MAGIC En Bronze se guarda el dato tal cual llega, sin limpiar, y se añaden dos columnas de auditoría con el fichero de origen de cada fila y el momento de la carga. El esquema lo damos escrito, como se hace en producción.
 
 # COMMAND ----------
 
@@ -111,7 +108,7 @@ print("bronze_telemetria:", spark.table(t("bronze_telemetria")).count(), "filas"
 # MAGIC ### Ahora tú
 # MAGIC Cuenta las lecturas de la Bronze por parque, de más a menos.
 # MAGIC
-# MAGIC **Comprueba:** P01 sale el primero, con muchas más lecturas que el resto.
+# MAGIC P01 debería salir el primero, con muchas más lecturas que el resto.
 
 # COMMAND ----------
 
@@ -121,7 +118,7 @@ display(spark.table(t("bronze_telemetria")).groupBy(___).count().orderBy(F.desc(
 
 # MAGIC %md
 # MAGIC ## 4 · Los datos sucios
-# MAGIC La Bronze no se limpia: se guarda tal cual. Pero conviene saber qué hay, porque el miércoles lo limpiaremos en Silver.
+# MAGIC La Bronze no se limpia, pero conviene saber qué trae porque el miércoles lo limpiaremos en Silver.
 
 # COMMAND ----------
 
@@ -135,7 +132,7 @@ print("Lecturas nulas:    ", b.filter(F.col("value").isNull()).count())
 # MAGIC ### Ahora tú
 # MAGIC Cuenta cuántas lecturas tienen calidad `BAD`.
 # MAGIC
-# MAGIC **Comprueba:** sale alrededor del 1 % de las filas.
+# MAGIC Debería salir alrededor del 1 % de las filas.
 
 # COMMAND ----------
 
@@ -144,7 +141,7 @@ print("Calidad BAD:", b.filter(F.col("quality") == ___).count())
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Para ir más allá (avanzado)
+# MAGIC ## Retos
 # MAGIC 1. Cuenta cuántas lecturas están repetidas: misma turbina, instante y señal.
 # MAGIC 2. Busca las turbinas que no están en el maestro (`df_turbinas()`) con un `left_anti`.
 # MAGIC 3. Mira el historial de la Bronze con `DESCRIBE HISTORY` y la pestaña History en Catalog Explorer.

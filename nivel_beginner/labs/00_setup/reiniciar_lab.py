@@ -5,7 +5,7 @@
 # MAGIC Borra de tu esquema lo que crea el lab del día que elijas, para repetirlo desde cero.
 # MAGIC
 # MAGIC - **Solo borra lo de ese día.** Si reinicias el día 1, el lab del día 2 se queda sin Bronze hasta que vuelvas a hacer el lab 1 o uses `ponerse_al_dia`.
-# MAGIC - No se ejecuta solo desde ningún lab: lo lanzas tú cuando quieras empezar de nuevo.
+# MAGIC - Ningún lab lo ejecuta automáticamente. Lo lanzas tú cuando quieras empezar de nuevo.
 # MAGIC - Lo creado desde la interfaz (el pipeline y el job del día 4, lo desplegado con el bundle el día 5) se borra desde la interfaz o con la CLI. Al final te dice cómo.
 
 # COMMAND ----------

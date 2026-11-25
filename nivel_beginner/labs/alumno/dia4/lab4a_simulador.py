@@ -2,13 +2,13 @@
 # MAGIC %md
 # MAGIC # Lab 4a · Simulador IoT en tiempo real (cada 10 s)
 # MAGIC
-# MAGIC Abridlo en **otra pestaña** y dejadlo corriendo mientras trabajáis en el lab 4b y 4c.
+# MAGIC Ábrelo en **otra pestaña** y déjalo corriendo mientras haces los labs 4b y 4c.
 # MAGIC Cada 10 s escribe un fichero JSON con una lectura por turbina y señal en `telemetria_stream/`.
 # MAGIC
 # MAGIC Incluye a propósito:
-# MAGIC - **Datos tardíos**: ~3 % de las lecturas llegan con un `ts` de hasta 3 min atrás.
-# MAGIC - **Anomalía**: la turbina `WTG-0013` se calienta progresivamente (para la alerta de la práctica).
-# MAGIC - **Cambio de esquema** a mitad: a partir de la iteración 30 aparece el campo `firmware_build` (Auto Loader *schema evolution*).
+# MAGIC - **Datos tardíos**: cerca del 3 % de las lecturas llega con un `ts` retrasado hasta 3 min.
+# MAGIC - **Anomalía**: la turbina `WTG-0013` se va calentando poco a poco. Es la que tiene que saltar en la alerta.
+# MAGIC - **Cambio de esquema**: a partir de la iteración 30 aparece el campo `firmware_build`, para probar la *schema evolution* de Auto Loader.
 
 # COMMAND ----------
 
