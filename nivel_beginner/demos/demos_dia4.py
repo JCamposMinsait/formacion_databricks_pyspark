@@ -146,6 +146,9 @@ update_id = w.pipelines.start_update(pipeline_id=pipeline_id, full_refresh=True)
 while (estado := w.pipelines.get_update(pipeline_id=pipeline_id, update_id=update_id).update.state.value) not in ("COMPLETED", "FAILED", "CANCELED"):
     time.sleep(10)
 print("Ejecución:", estado)
+if estado != "COMPLETED":
+    raise Exception("El pipeline no ha terminado bien. Mira el error en el enlace de arriba. "
+                    "En la cuenta gratuita solo puede haber un pipeline activo: para el del lab 4c si está en marcha.")
 
 # COMMAND ----------
 

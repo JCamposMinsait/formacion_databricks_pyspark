@@ -36,7 +36,7 @@ print(spark.table(t("demo_telemetria")).count(), "filas en demo_telemetria y su 
 from databricks.sdk import WorkspaceClient
 _w = WorkspaceClient()
 _scopes = [s.name for s in _w.secrets.list_scopes()]
-if "kv-formacion" in _scopes:
+if "kv-formacion" in _scopes and "pg-password" in [k.key for k in _w.secrets.list_secrets(scope="kv-formacion")]:
     SCOPE_DEMO = "kv-formacion"
 else:
     SCOPE_DEMO = "demo-secretos"
