@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 4: Streaming, pipelines y Lakeflow Jobs
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -14,14 +16,15 @@
 
 import json, datetime as dt
 
-DEMO_IN = f"{RUTA_VOL}/demo_stream_in"
-DEMO_CK = f"{RUTA_VOL}/_demo_ck"
-DEMO_SC = f"{RUTA_VOL}/_demo_schema"
+DEMO_IN = f"{RUTA_VOL}/demo_stream_in"    # donde llegan los ficheros
+DEMO_CK = f"{RUTA_VOL}/_demo_ck"          # checkpoints de los streams
+DEMO_SC = f"{RUTA_VOL}/_demo_schema"      # donde Auto Loader guarda el esquema que va viendo
 dbutils.fs.mkdirs(DEMO_IN)
 
 
 def lote(nombre, minuto, n=5, extra=None, retraso_min=0):
-    """Escribe un fichero JSON con n lecturas del minuto 10:mm. extra añade un campo nuevo, retraso_min las fecha antes."""
+    """Escribe en DEMO_IN un fichero JSON con n lecturas del minuto 10:mm.
+    extra cambia o añade campos. retraso_min fecha las lecturas unos minutos antes (datos que llegan tarde)."""
     filas = []
     for i in range(n):
         ts = dt.datetime(2026, 11, 2, 10, minuto - retraso_min, i, tzinfo=dt.timezone.utc)
@@ -33,22 +36,47 @@ def lote(nombre, minuto, n=5, extra=None, retraso_min=0):
         f.write("\n".join(filas))
     print("escrito", nombre)
 
+# COMMAND ----------
 
-def filas_bronze():
-    return spark.table(t("demo_stream_bronze")).count() if spark.catalog.tableExists(t("demo_stream_bronze")) else 0
+# MAGIC %md
+# MAGIC ## Checkpoint: la memoria del stream
+# MAGIC Un stream con `trigger(availableNow=True)` procesa lo que haya nuevo y se para, así que se puede programar como un batch. El checkpoint es la carpeta donde apunta qué ha procesado: al relanzarlo, sigue donde lo dejó. Un checkpoint por stream, y no se borra.
 
+# COMMAND ----------
 
-def bronze_stream():
-    antes = filas_bronze()
-    s = (spark.readStream.format("cloudFiles").option("cloudFiles.format", "json")
-         .option("cloudFiles.schemaLocation", DEMO_SC).option("cloudFiles.inferColumnTypes", "true")
-         .option("cloudFiles.schemaHints", "ts TIMESTAMP, value DOUBLE").load(DEMO_IN))
-    q = (s.writeStream.option("checkpointLocation", f"{DEMO_CK}/bronze").option("mergeSchema", "true")
-         .trigger(availableNow=True).toTable(t("demo_stream_bronze")))
-    q.awaitTermination()
-    print(f"bronze: {filas_bronze() - antes} filas nuevas")
-    return q
+lote("lote_01", 1)
+lote("lote_02", 2)
+display(dbutils.fs.ls(DEMO_IN))
 
+# COMMAND ----------
+
+# Escribe una función cargar_bronze() que lea DEMO_IN con Auto Loader y lo escriba en demo_stream_bronze:
+# - cloudFiles con formato json, schemaLocation DEMO_SC, inferColumnTypes y schemaHints "ts TIMESTAMP, value DOUBLE".
+# - Escritura con checkpoint en DEMO_CK/bronze, mergeSchema y trigger availableNow.
+# - Que espere a que acabe y devuelva la consulta.
+# Llámala, guarda la consulta en q y cuenta las filas de demo_stream_bronze.
+
+# COMMAND ----------
+
+lote("lote_03", 3)
+q = cargar_bronze()
+print("filas en la tabla:", spark.table(t("demo_stream_bronze")).count())
+display(dbutils.fs.ls(f"{DEMO_CK}/bronze"))
+
+# COMMAND ----------
+
+# Vigilar un stream: el último informe de progreso
+q.lastProgress
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Watermarks: cuánto esperar a los datos tardíos
+# MAGIC Una agregación por ventanas de tiempo en streaming no sabe cuándo una ventana está completa: siempre puede llegar una lectura atrasada. El watermark le dice cuánto esperar: "lo que llegue con más de 2 minutos de retraso respecto a lo último que he visto, se descarta". Con eso puede cerrar ventanas, escribirlas y olvidarse de ellas.
+# MAGIC
+# MAGIC La Gold de abajo calcula la temperatura máxima por turbina y minuto, con un watermark de 2 minutos.
+
+# COMMAND ----------
 
 def gold_stream():
     # Se lanza dos veces seguidas. Con availableNow, una ventana que el watermark acaba de cerrar
@@ -60,39 +88,9 @@ def gold_stream():
         (w.writeStream.outputMode("append").option("checkpointLocation", f"{DEMO_CK}/gold")
           .trigger(availableNow=True).toTable(t("demo_stream_gold"))).awaitTermination()
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Checkpoint: la memoria del stream
-
-# COMMAND ----------
-
-lote("lote_01", 1)
-lote("lote_02", 2)
-q = bronze_stream()
-print("filas en la tabla:", spark.table(t("demo_stream_bronze")).count())   # 10
-
-# COMMAND ----------
-
-lote("lote_03", 3)
-q = bronze_stream()
-print("filas en la tabla:", spark.table(t("demo_stream_bronze")).count())   # 15, no 25: el checkpoint sabe qué ficheros ya leyó
-display(dbutils.fs.ls(f"{DEMO_CK}/bronze"))                                  # offsets, commits, sources
-
-# COMMAND ----------
-
-# Vigilar un stream: el último informe de progreso (filas de entrada, duración, offsets).
-q.lastProgress
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Watermarks: cuánto esperar a los datos tardíos
-
-# COMMAND ----------
 
 lote("lote_04", 4)
-bronze_stream()
+cargar_bronze()
 gold_stream()
 display(spark.sql("SELECT minuto, sum(n) AS lecturas FROM demo_stream_gold GROUP BY ALL ORDER BY 1"))   # solo las ventanas ya cerradas
 
@@ -100,42 +98,42 @@ display(spark.sql("SELECT minuto, sum(n) AS lecturas FROM demo_stream_gold GROUP
 
 lote("lote_05", 9)                     # el tiempo avanza: el watermark pasa a las 10:07
 lote("lote_tarde", 9, retraso_min=8)   # lecturas de las 10:01 que llegan ahora, por debajo del watermark
-bronze_stream()
+cargar_bronze()
 gold_stream()
 display(spark.sql("SELECT minuto, sum(n) AS lecturas FROM demo_stream_gold GROUP BY ALL ORDER BY 1"))
 en_bronze = spark.sql("SELECT count(*) FROM demo_stream_bronze WHERE ts >= '2026-11-02 10:01:00' AND ts < '2026-11-02 10:02:00'").first()[0]
-print(f"Lecturas del minuto 10:01 en Bronze: {en_bronze}. En Gold siguen siendo 5: las tardías se han descartado.")
+print(f"Lecturas del minuto 10:01 en Bronze: {en_bronze}. En Gold siguen siendo 5.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Auto Loader: ingesta incremental de ficheros
+# MAGIC Si llega un campo nuevo, Auto Loader para el stream y apunta la columna en su esquema. Al relanzarlo sigue con ella. Para a propósito, para que el cambio no pase sin que nadie se entere.
 
 # COMMAND ----------
 
 lote("lote_06", 10, extra={"firmware_build": "2026.11-r7"})
 try:
-    bronze_stream()
+    cargar_bronze()
 except Exception as e:
     print("El stream se ha parado por la columna nueva. Es lo esperado: se relanza en la celda siguiente.")
 
 # COMMAND ----------
 
-bronze_stream()                                       # al relanzarlo, Auto Loader ya conoce la columna nueva
-spark.table(t("demo_stream_bronze")).printSchema()   # aparece firmware_build
+cargar_bronze()                                       # al relanzarlo, Auto Loader ya conoce la columna nueva
+spark.table(t("demo_stream_bronze")).printSchema()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## foreachBatch: lógica batch dentro de un stream
+# MAGIC Algunas cosas no se pueden escribir como un stream, por ejemplo un `MERGE`. Con `foreachBatch`, Spark le pasa a una función cada lote de filas nuevas como un DataFrame normal, y dentro se puede hacer cualquier cosa. Aquí, un `MERGE` que deja en una tabla la última lectura de cada turbina.
 
 # COMMAND ----------
 
 from delta.tables import DeltaTable
 
 spark.sql("CREATE OR REPLACE TABLE demo_ultima_lectura (turbine_id STRING, ts TIMESTAMP, value DOUBLE)")
-
-
 DESTINO = t("demo_ultima_lectura")
 
 
@@ -150,25 +148,25 @@ def upsert(lote_df, batch_id):
 (spark.readStream.table(t("demo_stream_bronze")).select("turbine_id", "ts", "value")
    .writeStream.foreachBatch(upsert).option("checkpointLocation", f"{DEMO_CK}/upsert")
    .trigger(availableNow=True).start().awaitTermination())
-display(spark.table(t("demo_ultima_lectura")))   # una fila por turbina, con la lectura de las 10:10
+display(spark.table(t("demo_ultima_lectura")))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Expectations: calidad declarada
+# MAGIC En un pipeline declarativo, las reglas de calidad se escriben como decoradores sobre la tabla. `expect` solo cuenta las filas que no cumplen, `expect_or_drop` las descarta y `expect_or_fail` para el pipeline. El código está en `pipeline_demo.py`, en esta carpeta.
 
 # COMMAND ----------
 
 # Unas cuantas lecturas malas para que las reglas del pipeline tengan algo que hacer
 lote("lote_07", 11)
-lote("lote_nulos", 12, n=2, extra={"value": None})         # sin valor: se descartan
-lote("lote_centinela", 13, n=3, extra={"value": -9999})    # el -9999 del sensor: se descartan
-lote("lote_caliente", 14, n=1, extra={"value": 130.0})     # pasa, pero cuenta como aviso
+lote("lote_nulos", 12, n=2, extra={"value": None})         # sin valor
+lote("lote_centinela", 13, n=3, extra={"value": -9999})    # el -9999 del sensor
+lote("lote_caliente", 14, n=1, extra={"value": 130.0})     # temperatura rara
 
 # COMMAND ----------
 
-# El código del pipeline está en pipeline_demo.py, en esta carpeta. En el lab 4c se crea desde Jobs & Pipelines;
-# aquí se crea con el SDK, que es lo mismo que haría un script de despliegue.
+# En el lab 4c se crea desde Jobs & Pipelines. Aquí se crea con el SDK, que es lo mismo que haría un script de despliegue.
 import os, time
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.pipelines import PipelineLibrary, FileLibrary
@@ -191,7 +189,7 @@ print("Pipeline:", f"{w.config.host}/pipelines/{pipeline_id}")
 
 # COMMAND ----------
 
-# Full refresh porque la limpieza del principio vuelve a escribir los mismos ficheros.
+# Lanza el pipeline con full refresh y espera a que acabe. Mientras corre, abrid el enlace de arriba.
 update_id = w.pipelines.start_update(pipeline_id=pipeline_id, full_refresh=True).update_id
 while (estado := w.pipelines.get_update(pipeline_id=pipeline_id, update_id=update_id).update.state.value) not in ("COMPLETED", "FAILED", "CANCELED"):
     time.sleep(10)
@@ -203,8 +201,8 @@ if estado != "COMPLETED":
 # COMMAND ----------
 
 TABLA_PIPELINE = f"{CATALOGO}.{ESQUEMA_PIPELINE}.demo_pipeline_silver"
-print("bronze:", spark.table(f"{CATALOGO}.{ESQUEMA_PIPELINE}.demo_pipeline_bronze").count())   # 46
-print("silver:", spark.table(TABLA_PIPELINE).count())                                          # 41: faltan los nulos y los -9999
+print("bronze:", spark.table(f"{CATALOGO}.{ESQUEMA_PIPELINE}.demo_pipeline_bronze").count())
+print("silver:", spark.table(TABLA_PIPELINE).count())
 display(spark.sql(f"""
     SELECT timestamp, details:flow_progress.data_quality.expectations
     FROM event_log(TABLE({TABLA_PIPELINE}))
@@ -216,6 +214,7 @@ display(spark.sql(f"""
 
 # MAGIC %md
 # MAGIC ## Parámetros y paso de valores entre tareas
+# MAGIC Un job pasa parámetros a sus notebooks como widgets. Entre tareas, los valores calculados viajan con `taskValues`: una tarea los publica y las siguientes los leen. Fuera de un job, `get` devuelve el `debugValue`, para poder probar el notebook suelto.
 
 # COMMAND ----------
 
@@ -229,6 +228,7 @@ print("task value (fuera de un job usa debugValue):",
 
 # MAGIC %md
 # MAGIC ## Cuando algo falla: repair run
+# MAGIC Si falla una tarea de un job, **Repair run** relanza solo esa y las que dependen de ella, sin repetir las que ya fueron bien. El historial de ejecuciones de todos los jobs está en las tablas de sistema.
 
 # COMMAND ----------
 
@@ -238,8 +238,3 @@ print("task value (fuera de un job usa debugValue):",
 # MAGIC WHERE period_start_time >= current_date() - 7
 # MAGIC ORDER BY period_start_time DESC
 # MAGIC LIMIT 50
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Limpieza

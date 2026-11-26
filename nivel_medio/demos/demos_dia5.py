@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 5: DataOps, gobernanza y consumo
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -35,11 +37,9 @@ print("Tablas Gold listas")
 
 # MAGIC %md
 # MAGIC ## Tests con pytest y Spark local
+# MAGIC Las transformaciones se escriben como funciones que reciben y devuelven un DataFrame. Un test les da unas pocas filas escritas a mano y comprueba el resultado. En el proyecto, el test vive en `tests/`, lo lanza pytest con un Spark local y se ejecuta en cada cambio en GitHub Actions, sin abrir Databricks.
 
 # COMMAND ----------
-
-from pyspark.testing import assertDataFrameEqual
-
 
 def limpiar_lecturas(df):
     return (df.withColumn("value", F.when(F.col("value") != -9999, F.col("value")))
@@ -48,32 +48,38 @@ def limpiar_lecturas(df):
 
 esquema = "turbine_id string, ts int, signal string, value double"
 entrada = spark.createDataFrame([("WTG-1", 1, "power_kw", -9999.0), ("WTG-1", 1, "power_kw", -9999.0), ("WTG-2", 1, "power_kw", 50.0)], esquema)
-esperado = spark.createDataFrame([("WTG-1", 1, "power_kw", None), ("WTG-2", 1, "power_kw", 50.0)], esquema)
-assertDataFrameEqual(limpiar_lecturas(entrada), esperado)
-print("test superado")
+display(entrada)
+
+# COMMAND ----------
+
+# Escribe el DataFrame esperado de limpiar_lecturas(entrada), con el mismo esquema,
+# y compáralo con assertDataFrameEqual (de pyspark.testing).
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## GRANT y REVOKE
+# MAGIC Para leer una tabla hacen falta `USE CATALOG`, `USE SCHEMA` y `SELECT`. Los permisos se dan a grupos y se heredan: un `SELECT` sobre el esquema vale para todas sus tablas, también las que se creen después.
 
 # COMMAND ----------
 
-ejecutar([
-    f"GRANT USE SCHEMA ON SCHEMA {CATALOGO}.{ESQUEMA} TO `{GRUPO_ANALISTAS}`",
-    f"GRANT SELECT ON TABLE {t('gold_kpi_parque_dia')} TO `{GRUPO_ANALISTAS}`",
-])
-display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
+ejecutar([f"GRANT USE SCHEMA ON SCHEMA {CATALOGO}.{ESQUEMA} TO `{GRUPO_ANALISTAS}`"])
 
 # COMMAND ----------
 
-ejecutar([f"REVOKE SELECT ON TABLE {t('gold_kpi_parque_dia')} FROM `{GRUPO_ANALISTAS}`"])
-display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
+# MAGIC %sql
+# MAGIC -- Da SELECT sobre gold_kpi_parque_dia al grupo `account users` y enseña los permisos de la tabla.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Quítalo y vuelve a enseñar los permisos.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Filtros de filas y máscaras de columnas
+# MAGIC Con un filtro de filas, cada usuario ve solo las filas que le tocan. Con una máscara, ve una columna transformada (redondeada, oculta...). Las dos son funciones SQL que se enganchan a la tabla, y deciden según quién consulta. Aquí, una tabla de permisos dice qué operadores ve cada usuario y si ve las coordenadas exactas.
 
 # COMMAND ----------
 
@@ -88,24 +94,30 @@ FROM VALUES
   AS t(park_id, nombre, operador, lat, lon)
 """)
 spark.sql(f"CREATE OR REPLACE TABLE {t('demo_permisos')} AS SELECT current_user() AS usuario, 'EnerSur' AS operador, false AS ve_coordenadas")
+display(spark.table(t("demo_parques")))
+display(spark.table(t("demo_permisos")))
+
+# COMMAND ----------
+
 ejecutar([
     f"CREATE OR REPLACE FUNCTION {t('demo_rf')}(op STRING) RETURN EXISTS (SELECT 1 FROM {t('demo_permisos')} p WHERE p.usuario = current_user() AND p.operador = op)",
     f"CREATE OR REPLACE FUNCTION {t('demo_cm')}(v DOUBLE) RETURN CASE WHEN EXISTS (SELECT 1 FROM {t('demo_permisos')} p WHERE p.usuario = current_user() AND p.ve_coordenadas) THEN v ELSE round(v, 1) END",
     f"ALTER TABLE {t('demo_parques')} SET ROW FILTER {t('demo_rf')} ON (operador)",
     f"ALTER TABLE {t('demo_parques')} ALTER COLUMN lat SET MASK {t('demo_cm')}",
 ])
-display(spark.table(t("demo_parques")))   # solo P01 y la latitud redondeada
+display(spark.table(t("demo_parques")))
 
 # COMMAND ----------
 
 # Te das permiso para otro operador y para ver las coordenadas exactas
 spark.sql(f"INSERT INTO {t('demo_permisos')} VALUES (current_user(), 'Viento Atlántico', true)")
-display(spark.table(t("demo_parques")))   # P01 y P03, con la latitud exacta
+display(spark.table(t("demo_parques")))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Auditoría y linaje con tablas de sistema
+# MAGIC Unity Catalog apunta quién accede a qué (`system.access.audit`) y de qué tablas sale cada tabla (`system.access.table_lineage`). Se consultan con SQL como cualquier tabla. Hace falta permiso sobre el catálogo `system`.
 
 # COMMAND ----------
 
@@ -128,6 +140,7 @@ display(spark.table(t("demo_parques")))   # P01 y P03, con la latitud exacta
 
 # MAGIC %md
 # MAGIC ## Cómo se paga Databricks
+# MAGIC Se paga en DBUs, unidades de cómputo, más el coste de las máquinas si el cómputo es clásico. Cada tipo de cómputo (serverless, jobs, SQL warehouse...) tiene su precio por DBU. El consumo detallado está en `system.billing.usage`.
 
 # COMMAND ----------
 
@@ -142,27 +155,29 @@ display(spark.table(t("demo_parques")))   # P01 y P03, con la latitud exacta
 
 # MAGIC %md
 # MAGIC ## Un dashboard de Databricks paso a paso
+# MAGIC Cada gráfico de un dashboard sale de un dataset, que es una consulta SQL. Las consultas se prueban aquí y se copian al dashboard.
 
 # COMMAND ----------
 
-DATASET_1 = f"""-- Dataset 1: energía por parque y día
-SELECT fecha, parque, energia_mwh, factor_capacidad_medio * 100 AS factor_capacidad_pct
-FROM {t('gold_kpi_parque_dia')}"""
+# MAGIC %sql
+# MAGIC -- Dataset 1: de gold_kpi_parque_dia, fecha, parque, energia_mwh y el factor de capacidad medio en porcentaje.
 
-DATASET_2 = f"""-- Dataset 2: turbinas a revisar
+# COMMAND ----------
+
+# Dataset 2: turbinas a revisar por bajo rendimiento, vibración alta para su día o multiplicadora caliente
+DATASET_2 = f"""
 WITH p AS (SELECT fecha, percentile(vibracion_media, 0.9) AS p90 FROM {t('gold_kpi_turbina_dia')} GROUP BY fecha)
 SELECT k.fecha, k.turbine_id, k.parque, k.rendimiento_medio, k.vibracion_media, k.temp_gearbox_max
 FROM {t('gold_kpi_turbina_dia')} k JOIN p USING (fecha)
 WHERE k.rendimiento_medio < 0.8 OR k.vibracion_media > p.p90 OR k.temp_gearbox_max > 78"""
-
-for q in [DATASET_1, DATASET_2]:
-    print(q, "\n")
+print(DATASET_2)
 display(spark.sql(DATASET_2))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Configurar un Genie space paso a paso
+# MAGIC Genie escribe SQL a partir de preguntas en lenguaje natural. Acierta en la medida en que se le explique el negocio: qué tablas, qué significa cada palabra, consultas de ejemplo y preguntas con su respuesta correcta (benchmarks) para medir si acierta. Esta celda imprime lo que se copia en el espacio.
 
 # COMMAND ----------
 
@@ -198,8 +213,3 @@ print("\nCONSULTA DE EJEMPLO\n" + CONSULTA_EJEMPLO)
 print("\nBENCHMARKS")
 for pregunta, sql in BENCHMARKS:
     print(f"- {pregunta}\n  {sql}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Limpieza

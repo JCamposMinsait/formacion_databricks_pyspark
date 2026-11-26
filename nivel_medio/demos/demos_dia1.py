@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 1: Plataforma, cómputo y Delta Lake
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -12,8 +14,8 @@
 
 # COMMAND ----------
 
-# Datos para las demos, en EAV:
-#   demo_telemetria        60 turbinas, 1 día (unas 173.000 filas). La usan casi todas las demos.
+# Datos para las demos, en formato largo (una fila por turbina, minuto y señal):
+#   demo_telemetria        60 turbinas, 1 día (172.800 filas). La usan casi todas las demos.
 #   demo_telemetria_grande 240 turbinas, 3 días (unos 2 millones). Solo para la demo de Liquid Clustering.
 import math, time, datetime as dt
 
@@ -39,11 +41,12 @@ print(spark.table(t("demo_telemetria_grande")).count(), "filas en demo_telemetri
 
 # MAGIC %md
 # MAGIC ## El notebook: lo que hay que dominar
+# MAGIC Celdas de Python, SQL (`%sql`) y markdown en el mismo notebook. Widgets para parametrizar, `%run` para traer configuración de otro notebook, `dbutils` para ficheros, secretos y widgets, y el depurador para parar dentro de una función.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT current_user() AS yo, current_catalog() AS catalogo, current_schema() AS esquema
+# MAGIC -- Quién soy, en qué catálogo y en qué esquema estoy: current_user(), current_catalog() y current_schema().
 
 # COMMAND ----------
 
@@ -72,33 +75,35 @@ print(potencia_teorica(9.0))
 
 # MAGIC %md
 # MAGIC ## De DBFS y mounts a Volumes
+# MAGIC Antes los ficheros iban a DBFS o a mounts de un storage, sin permisos por usuario. Los Volumes los sustituyen: son objetos de Unity Catalog, con permisos como una tabla, y se usan como una carpeta normal, también desde Python con `open()`.
 
 # COMMAND ----------
 
-display(dbutils.fs.ls(RUTA_VOL))
-with open(f"{RUTA_VOL}/hola.txt", "w") as f:
-    f.write("Esto es un fichero en un Volume de Unity Catalog\n")
-print(open(f"{RUTA_VOL}/hola.txt").read())
+# Lista el contenido de RUTA_VOL.
+# Escribe un hola.txt en el volume con open() de Python y léelo otra vez.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Unity Catalog: todo tiene tres apellidos
+# MAGIC `catálogo.esquema.objeto`. El catálogo suele separar entornos o áreas, el esquema agrupa lo de un tema y el objeto es la tabla, vista, volume o función. Los permisos se dan en cualquier nivel y se heredan hacia abajo.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SHOW CATALOGS
+# MAGIC -- Los catálogos que veo.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SHOW TABLES
+# MAGIC -- Las tablas del esquema en el que estoy.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Tablas managed y external
+# MAGIC - **Managed**: Unity Catalog decide dónde van los ficheros y los gestiona. `DROP` borra los datos, pero durante 7 días se recuperan con `UNDROP`.
+# MAGIC - **External**: la tabla apunta a una ruta de un storage que gestionas tú. `DROP` borra solo la definición y los ficheros se quedan.
 
 # COMMAND ----------
 
@@ -117,45 +122,59 @@ display(spark.table(DEMO_DROP))   # ha vuelto
 
 # MAGIC %md
 # MAGIC ## Qué formato usar para cada cosa
+# MAGIC - **CSV y JSON**: texto, fila a fila. Para intercambiar con otros sistemas. Ocupan mucho y el CSV no guarda tipos.
+# MAGIC - **Parquet**: por columnas, comprimido y con tipos. Leer dos columnas no obliga a leer el resto.
+# MAGIC - **Delta**: Parquet más un diario de cambios. Es el formato de las tablas en Databricks.
 
 # COMMAND ----------
 
 df = spark.table(t("demo_telemetria"))
 base = f"{RUTA_VOL}/formatos"
-for fmt in ["csv", "json", "parquet"]:
-    escritor = df.write.mode("overwrite").format(fmt)
-    if fmt == "csv":
-        escritor = escritor.option("header", "true")
-    escritor.save(f"{base}/{fmt}")
-    total = sum(f.size for f in dbutils.fs.ls(f"{base}/{fmt}") if f.name.startswith("part-"))
-    print(f"{fmt:8s} {total / 1024 / 1024:6.1f} MB")
-df.write.mode("overwrite").saveAsTable(t("demo_formatos_delta"))
-tam = spark.sql(f"DESCRIBE DETAIL {t('demo_formatos_delta')}").first().sizeInBytes
-print(f"{'delta':8s} {tam / 1024 / 1024:6.1f} MB")
 
 # COMMAND ----------
 
-spark.read.option("header", "true").csv(f"{base}/csv").printSchema()   # todo string: el CSV no sabe de tipos
+# Escribe df en CSV (con cabecera) en base/csv, en JSON en base/json y en Parquet en base/parquet.
+# Guárdalo también como la tabla Delta demo_formatos_delta.
+
+# COMMAND ----------
+
+def mb(ruta):
+    """Megas que ocupan los ficheros de datos de una carpeta."""
+    return sum(f.size for f in dbutils.fs.ls(ruta) if f.name.startswith("part-")) / 1024 / 1024
+
+
+for fmt in ["csv", "json", "parquet"]:
+    print(f"{fmt:8s} {mb(f'{base}/{fmt}'):6.1f} MB")
+delta_mb = spark.sql(f"DESCRIBE DETAIL {t('demo_formatos_delta')}").first().sizeInBytes / 1024 / 1024
+print(f"delta    {delta_mb:6.1f} MB")
+
+# COMMAND ----------
+
+# Lee otra vez el CSV de base/csv (con cabecera) y enseña su esquema.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Qué es Delta Lake
+# MAGIC Un formato abierto: ficheros Parquet más una carpeta `_delta_log` con un JSON por cada commit. Ese diario da transacciones ACID, historial, control de esquema y `UPDATE`, `DELETE` y `MERGE` sobre ficheros que en sí no se pueden modificar. En Databricks es el formato por defecto.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE OR REPLACE TABLE demo_fmt (id INT)
+# MAGIC -- Crea la tabla demo_fmt con una columna id INT, sin decir formato.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE DETAIL demo_fmt   -- columna format = delta
+# MAGIC -- Mira los detalles de demo_fmt (DESCRIBE DETAIL) y busca la columna format.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Una tabla Delta es Parquet más un diario
+# MAGIC Cada commit añade un JSON al `_delta_log` con los ficheros que entran (`add`) y los que salen (`remove`). Un `UPDATE` no toca ficheros: escribe ficheros nuevos y marca los viejos como borrados.
+# MAGIC
+# MAGIC La carpeta de una tabla managed no se puede listar. Con una ruta externa en `RUTA_EXTERNA` se ve el diario entero. Sin ella (Free Edition), `DESCRIBE DETAIL` enseña lo que hay.
 
 # COMMAND ----------
 
@@ -184,21 +203,30 @@ if RUTA_EXTERNA:
 
 # MAGIC %md
 # MAGIC ## Escribir en Delta: qué comando para qué
+# MAGIC - `INSERT INTO` añade. Si la carga se repite, se duplica.
+# MAGIC - `INSERT OVERWRITE` sustituye el contenido. Repetirlo deja lo mismo: es idempotente.
+# MAGIC - `MERGE` actualiza lo que ya existe e inserta lo nuevo. Lo vemos el miércoles.
 
 # COMMAND ----------
 
-spark.sql("CREATE OR REPLACE TABLE demo_escritura (id INT, v STRING)")
-for _ in range(2):
-    spark.sql("INSERT INTO demo_escritura VALUES (1, 'a'), (2, 'b')")
-print("Tras dos INSERT INTO:", spark.table(t("demo_escritura")).count(), "filas, duplicado")
-for _ in range(2):
-    spark.sql("INSERT OVERWRITE demo_escritura VALUES (1, 'a'), (2, 'b')")
-print("Tras dos INSERT OVERWRITE:", spark.table(t("demo_escritura")).count(), "filas, idempotente")
+# MAGIC %sql
+# MAGIC CREATE OR REPLACE TABLE demo_escritura (id INT, v STRING)
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Inserta (1, 'a') y (2, 'b') con INSERT INTO y cuenta las filas. Ejecuta la celda dos veces.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Lo mismo con INSERT OVERWRITE. Ejecuta la celda dos veces.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Time travel: cada commit es una versión
+# MAGIC Cada operación sobre una tabla Delta es un commit y deja una versión nueva. Una versión antigua se consulta con `VERSION AS OF` o `TIMESTAMP AS OF`, y se vuelve a ella con `RESTORE`. Vamos a borrar un parque por error y recuperarlo.
 
 # COMMAND ----------
 
@@ -209,7 +237,7 @@ display(spark.sql("SELECT park_id, count(*) AS filas FROM demo_tt GROUP BY ALL O
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DELETE FROM demo_tt WHERE park_id = 'P04'   -- el error
+# MAGIC -- El error: borra de demo_tt las filas del parque P04.
 
 # COMMAND ----------
 
@@ -219,17 +247,17 @@ display(spark.sql("SELECT park_id, count(*) AS filas FROM demo_tt GROUP BY ALL O
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE HISTORY demo_tt
+# MAGIC -- El historial de demo_tt.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT count(*) AS filas_en_la_version_0 FROM demo_tt VERSION AS OF 0
+# MAGIC -- Cuántas filas tenía demo_tt en la versión 0.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC RESTORE TABLE demo_tt TO VERSION AS OF 0
+# MAGIC -- Vuelve demo_tt a la versión 0.
 
 # COMMAND ----------
 
@@ -240,9 +268,11 @@ display(spark.sql("SELECT park_id, count(*) AS filas FROM demo_tt GROUP BY ALL O
 
 # MAGIC %md
 # MAGIC ## El problema de los ficheros pequeños
+# MAGIC Cada escritura deja al menos un fichero. Muchas escrituras pequeñas, como cargas cada minuto o streaming, dejan miles de ficheros diminutos, y abrirlos cuesta más que leerlos. `OPTIMIZE` los junta en ficheros grandes. Es un commit más: los viejos siguen ahí hasta el `VACUUM`.
 
 # COMMAND ----------
 
+# 40 escrituras de 1000 filas cada una
 spark.sql("DROP TABLE IF EXISTS demo_small")
 for i in range(40):
     spark.range(1000).write.mode("append").saveAsTable(t("demo_small"))
@@ -250,13 +280,20 @@ print("ficheros antes:", spark.sql("DESCRIBE DETAIL demo_small").first().numFile
 
 # COMMAND ----------
 
-display(spark.sql("OPTIMIZE demo_small"))
+# MAGIC %sql
+# MAGIC -- Compacta demo_small.
+
+# COMMAND ----------
+
 print("ficheros después:", spark.sql("DESCRIBE DETAIL demo_small").first().numFiles)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Ordenar los datos para leer menos
+# MAGIC Si las filas de una turbina están repartidas por todos los ficheros, filtrar por ella obliga a leerlos todos. Delta guarda en el diario el mínimo y el máximo de cada columna en cada fichero, y al filtrar se salta los ficheros que no pueden tener el valor (data skipping). Con `CLUSTER BY` (Liquid Clustering), Delta agrupa las filas por esa columna para que el salto sea grande. Sustituye a las particiones por carpetas y al `ZORDER`.
+# MAGIC
+# MAGIC La misma tabla de 2 millones de filas, sin ordenar y con `CLUSTER BY (turbine_id)`.
 
 # COMMAND ----------
 
@@ -279,6 +316,11 @@ for tabla in ["demo_sin_cluster", "demo_liquid"]:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC La misma consulta en las dos tablas. Debajo de cada resultado, **See performance** enseña cuántos ficheros y bytes ha leído.
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC SELECT count(*), avg(value) FROM demo_sin_cluster WHERE turbine_id = 'WTG-0040'
 
@@ -296,11 +338,12 @@ for tabla in ["demo_sin_cluster", "demo_liquid"]:
 
 # MAGIC %md
 # MAGIC ## VACUUM y la retención
+# MAGIC `VACUUM` borra del storage los ficheros que ya no usa la versión actual y que son más antiguos que la retención (7 días por defecto). Después ya no se puede volver a esas versiones. `DRY RUN` enseña lo que borraría sin borrar nada. En Unity Catalog, Predictive Optimization lanza `OPTIMIZE` y `VACUUM` solo.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC VACUUM demo_tt DRY RUN   -- vacía o casi: todo tiene menos de 7 días
+# MAGIC -- Qué borraría VACUUM en demo_tt, sin borrar nada.
 
 # COMMAND ----------
 
@@ -314,8 +357,3 @@ try:
     display(spark.sql("SELECT * FROM system.storage.predictive_optimization_operations_history LIMIT 20"))
 except Exception as e:
     print("Sin acceso a la tabla de sistema:", str(e).splitlines()[0][:150])
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Limpieza

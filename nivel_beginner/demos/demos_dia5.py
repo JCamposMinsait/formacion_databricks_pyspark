@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 5: Del notebook al proyecto, gobierno y consumo
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -35,6 +37,7 @@ print("Tablas Gold listas")
 
 # MAGIC %md
 # MAGIC ## 1. Del notebook al módulo
+# MAGIC La lógica que se repite sale del notebook a un fichero `.py` con funciones. Así se importa desde cualquier notebook o job, se revisa en Git como cualquier código y, sobre todo, se puede probar con un test automático. `utilidades_demo.py`, en esta carpeta, tiene una función que quita duplicados y convierte el -9999 en nulo.
 
 # COMMAND ----------
 
@@ -46,35 +49,43 @@ lecturas = spark.createDataFrame([
     ("WTG-0001", "2026-11-02 10:00:00", "power_kw", 3200.0),
     ("WTG-0001", "2026-11-02 10:00:00", "power_kw", 3200.0),
     ("WTG-0002", "2026-11-02 10:00:00", "power_kw", -9999.0)], "turbine_id string, ts string, signal string, value double")
+display(lecturas)
 display(limpiar_lecturas(lecturas))
 
 # COMMAND ----------
 
-from pyspark.testing import assertDataFrameEqual
+# MAGIC %md
+# MAGIC Un test le da a la función unos datos de entrada pequeños, escritos a mano, y comprueba que devuelve lo que tiene que devolver. Si alguien cambia la función y la rompe, el test falla antes de que llegue a producción.
 
-esperado = spark.createDataFrame([
-    ("WTG-0001", "2026-11-02 10:00:00", "power_kw", 3200.0),
-    ("WTG-0002", "2026-11-02 10:00:00", "power_kw", None)], "turbine_id string, ts string, signal string, value double")
-assertDataFrameEqual(limpiar_lecturas(lecturas), esperado)
-print("Test superado")
+# COMMAND ----------
+
+# Escribe el DataFrame esperado: WTG-0001 una sola vez con 3200 y WTG-0002 con value nulo (mismas columnas que lecturas).
+# Compáralo con limpiar_lecturas(lecturas) usando assertDataFrameEqual (de pyspark.testing).
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 4. Permisos y linaje
+# MAGIC En Unity Catalog los permisos se dan con `GRANT` y se quitan con `REVOKE`, sobre catálogos, esquemas, tablas o vistas. Para leer una tabla hacen falta tres: `USE CATALOG` en su catálogo, `USE SCHEMA` en su esquema y `SELECT` en la tabla. Los permisos se dan a grupos, no a personas.
 
 # COMMAND ----------
 
-ejecutar([
-    f"GRANT USE SCHEMA ON SCHEMA {CATALOGO}.{ESQUEMA} TO `{GRUPO_ANALISTAS}`",
-    f"GRANT SELECT ON TABLE {t('gold_kpi_parque_dia')} TO `{GRUPO_ANALISTAS}`",
-])
-display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
+ejecutar([f"GRANT USE SCHEMA ON SCHEMA {CATALOGO}.{ESQUEMA} TO `{GRUPO_ANALISTAS}`"])
 
 # COMMAND ----------
 
-ejecutar([f"REVOKE SELECT ON TABLE {t('gold_kpi_parque_dia')} FROM `{GRUPO_ANALISTAS}`"])
-display(spark.sql(f"SHOW GRANTS ON TABLE {t('gold_kpi_parque_dia')}"))
+# MAGIC %sql
+# MAGIC -- Da permiso de lectura sobre gold_kpi_parque_dia al grupo `account users` y enseña los permisos de la tabla.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Quítale ese permiso y vuelve a enseñar los permisos.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Unity Catalog apunta solo de qué tablas sale cada tabla (linaje). Se ve en la pestaña **Lineage** de cada tabla en Catalog, y también se puede consultar.
 
 # COMMAND ----------
 
@@ -91,21 +102,24 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC ## 5. Un dashboard
+# MAGIC Un dashboard de Databricks se monta con consultas SQL sobre las tablas Gold. Cada consulta es un dataset, y cada gráfico se pinta a partir de un dataset. Primero se prueban las consultas aquí y luego se copian al dashboard.
 
 # COMMAND ----------
 
-CONSULTAS = {
-    "Energía por parque y día": f"SELECT parque, fecha, energia_mwh FROM {t('gold_kpi_parque_dia')}",
-    "Turbinas a revisar": f"SELECT turbine_id, parque, fecha, rendimiento_medio, vibracion_media FROM {t('gold_kpi_turbina_dia')} WHERE rendimiento_medio < 0.8",
-}
-for nombre, consulta in CONSULTAS.items():
-    print(f"{nombre}\n{consulta}\n")
-display(spark.sql(CONSULTAS["Energía por parque y día"]))
+# MAGIC %sql
+# MAGIC SELECT parque, fecha, energia_mwh FROM gold_kpi_parque_dia ORDER BY fecha, parque
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Turbinas a revisar: de gold_kpi_turbina_dia, turbine_id, parque, fecha, rendimiento_medio y vibracion_media
+# MAGIC -- de las que tienen rendimiento_medio por debajo de 0,8.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 6. Genie
+# MAGIC Genie responde preguntas en lenguaje natural escribiendo SQL sobre las tablas que se le den. Funciona tan bien como lo bien que se le explique el negocio: qué tablas, qué significa cada palabra, alguna consulta de ejemplo y unas preguntas con su respuesta correcta para comprobar que acierta. Esta celda imprime lo que se copia en el espacio de Genie.
 
 # COMMAND ----------
 

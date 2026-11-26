@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 3: Delta Lake y arquitectura medallion
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -14,12 +16,18 @@
 
 # MAGIC %md
 # MAGIC ## 1. Una tabla Delta
+# MAGIC Una tabla Delta son ficheros Parquet más un registro de cambios (`_delta_log`). Cada operación que la cambia queda apuntada como una versión nueva. Por eso se puede hacer `UPDATE`, `DELETE` y `MERGE`, ver el historial y volver atrás. En Databricks, cualquier `CREATE TABLE` crea una tabla Delta.
 
 # COMMAND ----------
 
-spark.sql(f"CREATE OR REPLACE TABLE {t('demo_delta')} (turbine_id STRING, estado STRING, potencia_kw INT)")
-spark.sql(f"INSERT INTO {t('demo_delta')} VALUES ('WTG-0001', 'OPERATIVA', 4200), ('WTG-0002', 'OPERATIVA', 4500), ('WTG-0003', 'PARADA', 5000)")
-display(spark.sql(f"DESCRIBE DETAIL {t('demo_delta')}").select("format", "numFiles", "sizeInBytes", "location"))
+# MAGIC %sql
+# MAGIC -- Crea la tabla demo_delta con turbine_id STRING, estado STRING y potencia_kw INT.
+# MAGIC -- Mete tres turbinas: WTG-0001 OPERATIVA 4200, WTG-0002 OPERATIVA 4500 y WTG-0003 PARADA 5000.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Mira los detalles de demo_delta con DESCRIBE DETAIL: formato, número de ficheros y tamaño.
 
 # COMMAND ----------
 
@@ -28,34 +36,42 @@ display(spark.sql(f"DESCRIBE DETAIL {t('demo_delta')}").select("format", "numFil
 
 # COMMAND ----------
 
-spark.sql(f"UPDATE {t('demo_delta')} SET estado = 'MANTENIMIENTO' WHERE turbine_id = 'WTG-0003'")
-spark.sql(f"DELETE FROM {t('demo_delta')} WHERE turbine_id = 'WTG-0002'")
-spark.sql(f"INSERT INTO {t('demo_delta')} VALUES ('WTG-0004', 'OPERATIVA', 4200)")
-display(spark.table(t("demo_delta")).orderBy("turbine_id"))
+# MAGIC %sql
+# MAGIC -- Tres cambios, cada uno en su sentencia:
+# MAGIC -- WTG-0003 pasa a MANTENIMIENTO, WTG-0002 se borra y entra WTG-0004 OPERATIVA 4200.
+# MAGIC -- Después enseña la tabla ordenada por turbine_id.
 
 # COMMAND ----------
 
-display(spark.sql(f"DESCRIBE HISTORY {t('demo_delta')}").select("version", "timestamp", "operation", "operationMetrics").orderBy("version"))
+# MAGIC %sql
+# MAGIC -- El historial de demo_delta.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 3. Time travel y RESTORE
+# MAGIC Como cada versión queda guardada, se puede consultar la tabla tal y como estaba en una versión (`VERSION AS OF`) o en una hora (`TIMESTAMP AS OF`), y devolverla a ese punto con `RESTORE`.
 
 # COMMAND ----------
 
-display(spark.sql(f"SELECT * FROM {t('demo_delta')} VERSION AS OF 1 ORDER BY turbine_id"))   # como estaba tras el primer INSERT
+# MAGIC %sql
+# MAGIC -- demo_delta tal y como estaba en la versión 1, la del primer INSERT.
 
 # COMMAND ----------
 
-spark.sql(f"RESTORE TABLE {t('demo_delta')} TO VERSION AS OF 1")
-display(spark.table(t("demo_delta")).orderBy("turbine_id"))
-display(spark.sql(f"DESCRIBE HISTORY {t('demo_delta')}").select("version", "operation").orderBy("version"))   # el RESTORE es una versión más
+# MAGIC %sql
+# MAGIC -- Devuelve demo_delta a la versión 1 y enséñala.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC DESCRIBE HISTORY demo_delta   -- el RESTORE es una versión más
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 4. MERGE
+# MAGIC `MERGE` cruza una tabla con unos cambios por una clave y, en una sola operación, actualiza las filas que ya existen e inserta las nuevas. Es la forma normal de tener al día un maestro, y se puede relanzar sin duplicar nada.
 
 # COMMAND ----------
 
@@ -63,22 +79,25 @@ spark.sql(f"""CREATE OR REPLACE TABLE {t('demo_maestro')} AS
     SELECT * FROM VALUES ('WTG-0001', 'OPERATIVA'), ('WTG-0002', 'OPERATIVA'), ('WTG-0003', 'OPERATIVA') AS m(turbine_id, estado)""")
 cambios = spark.createDataFrame([("WTG-0002", "MANTENIMIENTO"), ("WTG-0004", "OPERATIVA")], "turbine_id string, estado string")
 cambios.createOrReplaceTempView("cambios_v")
-MERGE = f"""
-MERGE INTO {t('demo_maestro')} m
-USING cambios_v c ON m.turbine_id = c.turbine_id
-WHEN MATCHED AND m.estado <> c.estado THEN UPDATE SET m.estado = c.estado
-WHEN NOT MATCHED THEN INSERT *"""
-display(spark.sql(MERGE))                                  # una fila actualizada y otra insertada
 display(spark.table(t("demo_maestro")).orderBy("turbine_id"))
+display(cambios)
 
 # COMMAND ----------
 
-display(spark.sql(MERGE))                                  # relanzado: no cambia nada
+# MAGIC %sql
+# MAGIC -- MERGE de cambios_v en demo_maestro por turbine_id:
+# MAGIC -- si la turbina existe y su estado es distinto, actualiza el estado; si no existe, insértala.
+# MAGIC -- Ejecuta la celda dos veces y compara la salida.
+
+# COMMAND ----------
+
+display(spark.table(t("demo_maestro")).orderBy("turbine_id"))   # cómo ha quedado el maestro
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 5. Esquema
+# MAGIC Delta guarda el esquema de la tabla y rechaza escrituras que no encajan. Así una columna nueva o un tipo cambiado en el origen no ensucian la tabla sin que nadie se entere. Si el cambio es buscado, se permite de forma explícita.
 
 # COMMAND ----------
 
@@ -90,29 +109,37 @@ except Exception as e:
 
 # COMMAND ----------
 
-nueva.write.mode("append").option("mergeSchema", "true").saveAsTable(t("demo_maestro"))
-display(spark.table(t("demo_maestro")).orderBy("turbine_id"))   # la columna nueva sale con nulos en las filas viejas
+# Repite la escritura de nueva en demo_maestro, esta vez con la opción mergeSchema, y enseña la tabla.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 6. Ficheros pequeños
+# MAGIC Cada escritura deja al menos un fichero. Muchas escrituras pequeñas dejan muchos ficheros diminutos, y leerlos es lento porque se pierde más tiempo abriéndolos que leyendo. `OPTIMIZE` los junta en pocos ficheros grandes.
 
 # COMMAND ----------
 
+# 20 escrituras de 100 filas cada una
 for i in range(20):
     spark.range(i * 100, i * 100 + 100).write.mode("append").saveAsTable(t("demo_small"))
 print("ficheros:", spark.sql(f"DESCRIBE DETAIL {t('demo_small')}").first().numFiles)
 
 # COMMAND ----------
 
-spark.sql(f"OPTIMIZE {t('demo_small')}")
+# MAGIC %sql
+# MAGIC -- Compacta demo_small.
+
+# COMMAND ----------
+
 print("tras OPTIMIZE:", spark.sql(f"DESCRIBE DETAIL {t('demo_small')}").first().numFiles)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 7. Un medallion en pequeño
+# MAGIC - **Bronze**: los datos tal cual llegan, con sus duplicados y sus errores. Si algo sale mal después, se puede rehacer todo desde aquí.
+# MAGIC - **Silver**: limpios, sin duplicados y con los tipos correctos. Es la capa en la que se puede confiar.
+# MAGIC - **Gold**: agregados y listos para un informe o un cuadro de mando.
 
 # COMMAND ----------
 
@@ -127,21 +154,28 @@ display(spark.table(t("demo_bronze")))
 
 # COMMAND ----------
 
-silver = (spark.table(t("demo_bronze"))
-          .dropDuplicates()
-          .withColumn("ts", F.to_timestamp("ts"))
-          .withColumn("value", F.expr("try_cast(value AS double)"))
-          .withColumn("value", F.when(F.col("value") != -9999, F.col("value"))))
-silver.write.mode("overwrite").saveAsTable(t("demo_silver"))      # Silver: sin duplicados, tipada y sin centinelas
-display(spark.table(t("demo_silver")))
+# Silver a partir de demo_bronze:
+# 1. Quita las filas duplicadas.
+# 2. ts a timestamp.
+# 3. value a double con try_cast.
+# 4. El -9999 a nulo.
+# Guárdala como demo_silver y enséñala.
 
 # COMMAND ----------
 
-gold = (spark.table(t("demo_silver"))
-        .join(df_turbinas().select("turbine_id", "park_id"), "turbine_id")
-        .groupBy("park_id", F.to_date("ts").alias("fecha"))
-        .agg(F.round(F.sum("value") / 60 / 1000, 4).alias("energia_mwh")))
-gold.write.mode("overwrite").saveAsTable(t("demo_gold"))          # Gold: el KPI que consume el negocio
+# Gold a partir de demo_silver: energía en MWh por parque y día.
+# 1. Une con df_turbinas() por turbine_id para tener park_id.
+# 2. Agrupa por park_id y por la fecha de ts (F.to_date).
+# 3. Energía = suma de value / 60 / 1000, redondeada a 4 decimales.
+# Guárdala como demo_gold y enséñala.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC La Gold la va a usar gente que no ha visto este código. Un comentario en la tabla y en cada columna dice qué es cada cosa, y sale en Catalog y en las búsquedas.
+
+# COMMAND ----------
+
 spark.sql(f"COMMENT ON TABLE {t('demo_gold')} IS 'Energía producida por parque y día'")
 spark.sql(f"ALTER TABLE {t('demo_gold')} ALTER COLUMN energia_mwh COMMENT 'Energía en MWh: suma de la potencia de cada minuto'")
-display(spark.table(t("demo_gold")))
+display(spark.sql(f"DESCRIBE TABLE {t('demo_gold')}"))

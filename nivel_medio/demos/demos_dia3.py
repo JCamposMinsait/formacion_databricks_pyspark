@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 3: Medallion, SQL avanzado y UDFs
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -12,7 +14,7 @@
 
 # COMMAND ----------
 
-# Datos para las demos: 60 turbinas, 1 día, en EAV (unas 173.000 filas).
+# Datos para las demos: 60 turbinas, 1 día, en formato largo (172.800 filas).
 import math, time, datetime as dt
 import pandas as pd
 
@@ -31,10 +33,18 @@ def generar_demo(turbinas, minutos):
     .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(t("demo_telemetria")))
 print(spark.table(t("demo_telemetria")).count(), "filas en demo_telemetria")
 
+
+def cronometrar(nombre, df):
+    """Hace un count de df y dice cuánto ha tardado."""
+    t0 = time.time()
+    df.count()
+    print(f"{nombre}: {time.time() - t0:.1f} s")
+
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Datos anidados: struct, array y explode
+# MAGIC Muchos mensajes de IoT llegan anidados: un `struct` es un grupo de campos con nombre (se accede con un punto) y un `array` es una lista. `explode` saca una fila por cada elemento de la lista.
 
 # COMMAND ----------
 
@@ -42,26 +52,32 @@ msg = spark.createDataFrame([
     ("WTG-0001", "2026-11-02T10:00:00Z", [("power_kw", 2840.0), ("wind_speed", 9.2)], ("3.2.1", "P01")),
     ("WTG-0002", "2026-11-02T10:00:00Z", [], ("3.2.1", "P01"))],
     "turbine_id string, ts string, lecturas array<struct<signal:string,value:double>>, meta struct<fw:string,site:string>")
-display(msg.select("turbine_id", "meta.fw", F.explode("lecturas").alias("l")).select("turbine_id", "fw", "l.*"))         # WTG-0002 desaparece
-display(msg.select("turbine_id", "meta.fw", F.explode_outer("lecturas").alias("l")).select("turbine_id", "fw", "l.*"))   # se queda con nulos
+msg.printSchema()
+display(msg)
+
+# COMMAND ----------
+
+# Saca una fila por lectura: turbine_id, meta.fw y explode de lecturas con alias l.
+# Después despliega los campos de l con l.*.
+# Repítelo con explode_outer y compara qué pasa con WTG-0002.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## PIVOT en SQL y en PySpark
+# MAGIC La telemetría viene en formato largo, una fila por señal. Para comparar señales del mismo minuto hace falta una columna por señal. `PIVOT` hace ese giro.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM (SELECT turbine_id, ts, signal, value FROM demo_telemetria)
-# MAGIC PIVOT (avg(value) FOR signal IN ('wind_speed' AS wind_speed, 'power_kw' AS power_kw))
-# MAGIC ORDER BY turbine_id, ts
-# MAGIC LIMIT 10
+# MAGIC -- Sobre demo_telemetria, una fila por turbine_id y ts con una columna wind_speed y otra power_kw (avg de value).
+# MAGIC -- Ordena por turbina y hora y enseña 10 filas.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Estrella o copo de nieve
+# MAGIC Una tabla de hechos con lo que se mide (energía por turbina y día) y una dimensión con todo lo que describe a la turbina (parque, provincia, fabricante), ya aplanada. En estrella cada consulta es un solo join. En copo de nieve la dimensión se parte en varias tablas y hacen falta más joins.
 
 # COMMAND ----------
 
@@ -73,30 +89,28 @@ dim.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(t("dem
 (spark.table(t("demo_telemetria")).filter("signal = 'power_kw'")
    .groupBy("turbine_id", F.to_date("ts").alias("fecha")).agg((F.sum("value") / 60 / 1000).alias("energia_mwh"))
    .write.mode("overwrite").saveAsTable(t("demo_hechos_energia")))
-print("dimensión y hechos creados")
+display(spark.table(t("demo_hechos_energia")).limit(5))
+display(spark.table(t("demo_dim_turbina")).limit(5))
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT d.fabricante, d.provincia, round(sum(h.energia_mwh), 1) AS mwh
-# MAGIC FROM demo_hechos_energia h JOIN demo_dim_turbina d USING (turbine_id)
-# MAGIC GROUP BY ALL
-# MAGIC ORDER BY mwh DESC
+# MAGIC -- Energía total por fabricante y provincia: une demo_hechos_energia con demo_dim_turbina por turbine_id.
+# MAGIC -- Redondea a 1 decimal y ordena de más a menos.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Tablas, vistas y vistas materializadas
+# MAGIC - **Tabla**: los datos guardados. Hay que recargarla para que cambie.
+# MAGIC - **Vista**: una consulta con nombre. No guarda nada y se calcula cada vez que se lee, así que siempre está al día pero cuesta lo que cueste la consulta.
+# MAGIC - **Vista materializada**: una consulta cuyo resultado se guarda y Databricks refresca. Se lee rápido y se mantiene sola.
 
 # COMMAND ----------
 
-spark.sql("""
-CREATE OR REPLACE VIEW demo_v_energia_parque AS
-SELECT d.parque, sum(h.energia_mwh) AS mwh
-FROM demo_hechos_energia h JOIN demo_dim_turbina d USING (turbine_id)
-GROUP BY ALL
-""")
-display(spark.table("demo_v_energia_parque"))
+# MAGIC %sql
+# MAGIC -- Crea la vista demo_v_energia_parque con la energía total por parque (hechos y dimensión por turbine_id).
+# MAGIC -- Después consúltala.
 
 # COMMAND ----------
 
@@ -112,6 +126,7 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## NULL: la fuente de la mitad de los bugs
+# MAGIC Antes de ejecutar, ¿qué sale en cada columna?
 
 # COMMAND ----------
 
@@ -132,6 +147,9 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## Funciones de ventana: mirar a las filas vecinas
+# MAGIC Una función de ventana calcula algo para cada fila mirando a otras filas, sin agrupar: cada fila sigue ahí. `PARTITION BY` dice qué filas son vecinas, `ORDER BY` en qué orden y el marco (`ROWS` o `RANGE`) cuántas se miran.
+# MAGIC
+# MAGIC El marco por defecto despista: con `ORDER BY` y sin marco, la ventana va desde el principio hasta la fila actual.
 
 # COMMAND ----------
 
@@ -146,6 +164,7 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## LAG y LEAD en series temporales
+# MAGIC `LAG` trae el valor de la fila anterior y `LEAD` el de la siguiente. Con la hora anterior se ven los huecos: minutos en los que una turbina no mandó nada.
 
 # COMMAND ----------
 
@@ -159,6 +178,7 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## Medias móviles: ROWS o RANGE
+# MAGIC `ROWS` cuenta filas y `RANGE` cuenta tiempo. Con huecos en los datos no dan lo mismo.
 
 # COMMAND ----------
 
@@ -173,15 +193,22 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## Deduplicar con row_number y QUALIFY
+# MAGIC Cuando la misma lectura llega dos veces con valores distintos, `dropDuplicates` se queda con una cualquiera. Con `row_number` se decide cuál: por ejemplo, la última que llegó. `QUALIFY` filtra por el resultado de una ventana, como `HAVING` filtra por un agregado.
+
+# COMMAND ----------
+
+spark.createDataFrame([
+    ("WTG-1", dt.datetime(2026, 11, 2, 10, 0, 0), "power_kw", 100.0, dt.datetime(2026, 11, 2, 10, 0, 5)),
+    ("WTG-1", dt.datetime(2026, 11, 2, 10, 0, 0), "power_kw", 120.0, dt.datetime(2026, 11, 2, 10, 3, 0)),
+    ("WTG-1", dt.datetime(2026, 11, 2, 10, 1, 0), "power_kw", 130.0, dt.datetime(2026, 11, 2, 10, 1, 4))],
+    "turbine_id string, ts timestamp, signal string, value double, ingested_at timestamp").createOrReplaceTempView("ingestas_v")
+display(spark.table("ingestas_v"))
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM VALUES
-# MAGIC   ('WTG-1', timestamp'2026-11-02 10:00:00', 'power_kw', 100.0, timestamp'2026-11-02 10:00:05'),
-# MAGIC   ('WTG-1', timestamp'2026-11-02 10:00:00', 'power_kw', 120.0, timestamp'2026-11-02 10:03:00')
-# MAGIC   AS t(turbine_id, ts, signal, value, ingested_at)
-# MAGIC QUALIFY row_number() OVER (PARTITION BY turbine_id, ts, signal ORDER BY ingested_at DESC) = 1
+# MAGIC -- De ingestas_v, una fila por turbine_id, ts y signal: la que llegó la última (ingested_at más reciente).
+# MAGIC -- Usa row_number() en una ventana y QUALIFY.
 
 # COMMAND ----------
 
@@ -193,6 +220,7 @@ display(spark.table("demo_v_energia_parque"))
 
 # MAGIC %md
 # MAGIC ## Fechas, franjas y zonas horarias
+# MAGIC Las turbinas mandan la hora en UTC y se guarda en UTC. Se pasa a hora local solo para enseñarla. En el cambio de hora de octubre, la misma hora local pasa dos veces.
 
 # COMMAND ----------
 
@@ -210,77 +238,79 @@ display(spark.table("demo_v_energia_parque"))
 # MAGIC %md
 # MAGIC ## UDFs de Python: potentes y lentas
 # MAGIC ## Pandas UDFs: vectorizadas con Arrow
+# MAGIC - Una **UDF** normal recibe un valor cada vez: cada fila sale del motor a Python y vuelve.
+# MAGIC - Una **Pandas UDF** recibe un bloque de miles de filas como `pd.Series`, que viaja en formato Arrow, y trabaja con pandas sobre el bloque entero.
+# MAGIC - Una **función nativa** (`F.when`, `F.pow`...) no sale del motor.
+# MAGIC
+# MAGIC La misma potencia teórica de las tres formas sobre 2 millones de velocidades de viento.
 
 # COMMAND ----------
 
 from pyspark.sql.functions import udf, pandas_udf
 
-
-def pt(v):
-    return 0.0 if v is None or v < 3 or v >= 25 else min(0.5 * 1.225 * math.pi * 75 ** 2 * v ** 3 * 0.45 / 1000, 4200.0)
+K = 0.5 * 1.225 * math.pi * 75 ** 2 * 0.45 / 1000   # kW por (m/s)^3 con un rotor de 150 m
 
 
-u = udf(pt, "double")
+@udf("double")
+def con_udf(v):
+    return 0.0 if v < 3 else min(K * v ** 3, 4200.0)
 
 
 @pandas_udf("double")
-def pu(v: pd.Series) -> pd.Series:
-    p = (0.5 * 1.225 * math.pi * 75 ** 2 * v.pow(3) * 0.45 / 1000).clip(upper=4200.0)
-    return p.where((v >= 3) & (v < 25), 0.0).fillna(0.0)
+def con_pandas_udf(v: pd.Series) -> pd.Series:
+    return (K * v ** 3).clip(upper=4200.0).where(v >= 3, 0.0)
 
 
-nat = (F.when((F.col("v") < 3) | (F.col("v") >= 25), 0.0)
-        .otherwise(F.least(F.lit(0.5 * 1.225 * math.pi * 75 ** 2 * 0.45 / 1000) * F.pow("v", 3), F.lit(4200.0))))
+nativa = F.when(F.col("v") < 3, 0.0).otherwise(F.least(F.lit(K) * F.pow("v", 3), F.lit(4200.0)))
 
-df = spark.range(0, 2_000_000).select((F.rand(1) * 20).alias("v"))
-for nombre, expr in [("UDF", u("v")), ("Pandas UDF", pu("v")), ("Nativa", nat)]:
-    t_ini = time.time()
-    df.select(expr.alias("p")).agg(F.sum("p")).collect()
-    print(f"{nombre:10s} {time.time() - t_ini:5.1f} s")
+datos = spark.range(2_000_000).select((F.rand(1) * 20).alias("v"))
+cronometrar("UDF       ", datos.select(con_udf("v").alias("p")).filter("p > 1000"))
+cronometrar("Pandas UDF", datos.select(con_pandas_udf("v").alias("p")).filter("p > 1000"))
+cronometrar("Nativa    ", datos.select(nativa.alias("p")).filter("p > 1000"))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Orden de preferencia para extender Spark
+# MAGIC 1. Funciones nativas de Spark.
+# MAGIC 1. Funciones SQL de Unity Catalog: se escriben en SQL, quedan guardadas en el catálogo con permisos y las usa cualquiera, desde SQL o desde Python.
+# MAGIC 1. Pandas UDF.
+# MAGIC 1. UDF de Python, solo si no hay otra forma.
 
 # COMMAND ----------
 
-spark.sql("""
-CREATE OR REPLACE FUNCTION demo_fn_mwh(kw DOUBLE) RETURNS DOUBLE
-COMMENT 'kW medios de un minuto a MWh'
-RETURN kw / 60 / 1000
-""")
-display(spark.sql("SELECT demo_fn_mwh(3000) AS mwh"))
+# MAGIC %sql
+# MAGIC -- Crea la función demo_fn_mwh(kw DOUBLE) que devuelve kw / 60 / 1000 (kW de un minuto a MWh), con un comentario.
+# MAGIC -- Pruébala con 3000.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## MERGE INTO: insertar, actualizar y borrar a la vez
+# MAGIC `MERGE` cruza la tabla destino con el origen por una clave. `WHEN MATCHED` es lo que está en los dos, `WHEN NOT MATCHED` lo que solo está en el origen y `WHEN NOT MATCHED BY SOURCE` lo que solo está en el destino. Cada caso puede actualizar, insertar o borrar, y se le pueden añadir condiciones.
 
 # COMMAND ----------
 
 spark.sql("CREATE OR REPLACE TABLE demo_merge AS SELECT * FROM VALUES ('A', 1), ('B', 2), ('C', 3) AS t(k, v)")
+spark.sql("CREATE OR REPLACE TEMP VIEW origen_v AS SELECT * FROM VALUES ('B', 20), ('D', 4) AS s(k, v)")
 display(spark.table("demo_merge").orderBy("k"))
+display(spark.table("origen_v").orderBy("k"))
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC MERGE INTO demo_merge t
-# MAGIC USING (SELECT * FROM VALUES ('B', 20), ('D', 4) AS s(k, v)) s
-# MAGIC ON t.k = s.k
-# MAGIC WHEN MATCHED THEN UPDATE SET v = s.v
-# MAGIC WHEN NOT MATCHED THEN INSERT *
-# MAGIC WHEN NOT MATCHED BY SOURCE AND t.k = 'C' THEN DELETE
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT * FROM demo_merge ORDER BY k   -- A 1, B 20, D 4
+# MAGIC -- MERGE de origen_v en demo_merge por k:
+# MAGIC -- si está en los dos, actualiza v; si solo está en el origen, insértala;
+# MAGIC -- si solo está en el destino y k es 'C', bórrala.
+# MAGIC -- Después enseña demo_merge ordenada por k.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## SCD tipo 2 con un único MERGE
+# MAGIC En un SCD tipo 2 no se pisa el valor viejo: se cierra la fila vigente (fecha de fin y `es_actual = false`) y se inserta una nueva con el valor nuevo. Así se sabe qué estado tenía cada turbina en cada momento.
+# MAGIC
+# MAGIC El problema es que un `MERGE` hace una sola cosa por cada fila del origen, y aquí hacen falta dos (cerrar e insertar). El truco es meter cada cambio dos veces en el origen: una con la clave, que encuentra la fila vigente y la cierra, y otra con la clave a `NULL`, que no encuentra nada y se inserta.
 
 # COMMAND ----------
 
@@ -300,6 +330,7 @@ VALUES ('WTG-0007', 'OPERATIVA', timestamp'2024-01-01', NULL, true)
 """)
 spark.sql("CREATE OR REPLACE TEMP VIEW extracto AS SELECT * FROM VALUES ('WTG-0007', 'MANTENIMIENTO') AS e(turbine_id, estado)")
 display(spark.table("demo_scd2"))
+display(spark.table("extracto"))
 
 # COMMAND ----------
 
@@ -327,43 +358,33 @@ display(spark.table("demo_scd2"))
 
 # MAGIC %md
 # MAGIC ## CLONE: copias de tablas en segundos
+# MAGIC - `DEEP CLONE` copia los datos y el esquema a una tabla independiente. Sirve para copias de seguridad o para llevar datos a otro entorno.
+# MAGIC - `SHALLOW CLONE` solo copia el diario: apunta a los ficheros de la original. Es instantáneo y sirve para pruebas.
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE OR REPLACE TABLE demo_scd2_backup DEEP CLONE demo_scd2
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC DESCRIBE HISTORY demo_scd2_backup   -- la versión 0 es la operación CLONE
+# MAGIC -- Haz una copia completa de demo_scd2 llamada demo_scd2_backup y mira su historial.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Documentar las tablas: el metadato también cuenta
+# MAGIC Comentarios en tablas y columnas, claves primarias y ajenas (informativas: Databricks no las comprueba, pero las usan las herramientas y el optimizador) y etiquetas para buscar y gobernar.
 
 # COMMAND ----------
 
-for s in [
-    "COMMENT ON TABLE demo_hechos_energia IS 'Energía diaria por turbina (MWh)'",
-    "ALTER TABLE demo_hechos_energia ALTER COLUMN energia_mwh COMMENT 'Suma de la potencia media de cada minuto / 60 / 1000'",
-    "ALTER TABLE demo_hechos_energia DROP CONSTRAINT IF EXISTS fk_demo_turbina",
-    "ALTER TABLE demo_dim_turbina DROP PRIMARY KEY IF EXISTS",
-    "ALTER TABLE demo_dim_turbina ALTER COLUMN turbine_id SET NOT NULL",
-    "ALTER TABLE demo_dim_turbina ADD CONSTRAINT pk_demo_turbina PRIMARY KEY (turbine_id)",
-    "ALTER TABLE demo_hechos_energia ADD CONSTRAINT fk_demo_turbina FOREIGN KEY (turbine_id) REFERENCES demo_dim_turbina",
-    "ALTER TABLE demo_hechos_energia SET TAGS ('dominio' = 'eolica', 'capa' = 'gold')",
-]:
-    spark.sql(s)
-    print("ok:", s[:95])
+# MAGIC %sql
+# MAGIC COMMENT ON TABLE demo_hechos_energia IS 'Energía diaria por turbina (MWh)';
+# MAGIC ALTER TABLE demo_hechos_energia ALTER COLUMN energia_mwh COMMENT 'Suma de la potencia media de cada minuto / 60 / 1000';
+# MAGIC ALTER TABLE demo_hechos_energia DROP CONSTRAINT IF EXISTS fk_demo_turbina;
+# MAGIC ALTER TABLE demo_dim_turbina DROP PRIMARY KEY IF EXISTS;
+# MAGIC ALTER TABLE demo_dim_turbina ALTER COLUMN turbine_id SET NOT NULL;
+# MAGIC ALTER TABLE demo_dim_turbina ADD CONSTRAINT pk_demo_turbina PRIMARY KEY (turbine_id);
+# MAGIC ALTER TABLE demo_hechos_energia ADD CONSTRAINT fk_demo_turbina FOREIGN KEY (turbine_id) REFERENCES demo_dim_turbina;
+# MAGIC ALTER TABLE demo_hechos_energia SET TAGS ('dominio' = 'eolica', 'capa' = 'gold');
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC DESCRIBE TABLE EXTENDED demo_hechos_energia
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Limpieza

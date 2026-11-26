@@ -68,9 +68,11 @@ display(filas_por_particion(lecturas.repartition(8).coalesce(2)))   # 2 particio
 
 # MAGIC %md
 # MAGIC ### Ahora tú
-# MAGIC Reparte las lecturas en 8 particiones **por parque** (`repartition(8, "park_id")`) y cuenta filas por partición.
+# MAGIC Hasta ahora `repartition(n)` repartía las filas sin mirar lo que tienen. Si además le pasas una columna, `repartition(n, "columna")`, todas las filas con el mismo valor van a la misma partición. Es lo que hace Spark por dentro en un `groupBy` o en un `join` por esa columna: junta en un sitio todo lo de cada clave.
 # MAGIC
-# MAGIC La partición de P01 se lleva ella sola el 60 % de las filas. Eso es skew. Salen menos de 8 filas porque, con solo seis parques, el hash deja particiones vacías y junta dos parques en la misma.
+# MAGIC Reparte las lecturas por `park_id` y cuenta las filas de cada partición. Tú eliges cuántas particiones: piensa cuántos parques hay (`lecturas.select("park_id").distinct().count()`) y qué número tendría sentido.
+# MAGIC
+# MAGIC Después mira el resultado. ¿Sale una partición por parque? ¿Salen parejas? ¿Por qué una tiene tantas más filas que las demás? Acuérdate de cómo se reparten las turbinas en el maestro.
 
 # COMMAND ----------
 
@@ -80,7 +82,26 @@ display(filas_por_particion(lecturas.repartition(___, ___)))
 
 # MAGIC %md
 # MAGIC ## 3 · Skew y broadcast
-# MAGIC Si se reparte por una clave desequilibrada, una sola tarea hace casi todo el trabajo. Poner más particiones no lo arregla, porque las filas de una misma clave van siempre juntas. El broadcast sí lo arregla, porque la tabla grande no se mueve.
+# MAGIC Lo que acabas de ver se llama skew: una clave con muchas más filas que las demás. En un `groupBy` o un `join` por `park_id`, Spark reparte justo así, y la tarea que se queda con P01 hace casi todo el trabajo mientras las demás esperan.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Ahora tú
+# MAGIC Lo primero que se le ocurre a cualquiera es poner más particiones, para que cada una tenga menos trabajo. Repite el reparto por parque con 16 particiones.
+# MAGIC
+# MAGIC ¿Mejora la partición de P01? ¿Por qué crees que pasa?
+
+# COMMAND ----------
+
+display(filas_por_particion(lecturas.repartition(___, "park_id")))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC En un join con una tabla pequeña hay una salida mejor: el broadcast. La tabla pequeña se copia entera a cada máquina y la grande no se reparte por la clave, así que da igual lo desequilibrada que esté.
+# MAGIC
+# MAGIC Compara los dos planes. Con sort-merge hay un Exchange por `park_id` en los dos lados. Con broadcast, las lecturas no tienen Exchange.
 
 # COMMAND ----------
 
@@ -90,18 +111,6 @@ lecturas.join(tarifas.hint("merge"), "park_id").explain()       # sort-merge: Ex
 # COMMAND ----------
 
 lecturas.join(F.broadcast(tarifas), "park_id").explain()         # broadcast: sin Exchange en las lecturas
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Ahora tú
-# MAGIC Repite el reparto por parque, pero con 16 particiones. ¿Mejora P01?
-# MAGIC
-# MAGIC No mejora, P01 sigue entero en una sola partición.
-
-# COMMAND ----------
-
-display(filas_por_particion(lecturas.repartition(___, "park_id")))
 
 # COMMAND ----------
 
@@ -146,7 +155,7 @@ print(f"Con UDF: {time.time() - t0:.1f} s")
 # MAGIC Van de menos a más. El último es para quien vaya sobrado.
 # MAGIC
 # MAGIC 1. ¿En cuántas particiones llega la Bronze tal cual la lees y cuántas filas trae cada una? Usa `filas_por_particion` sin repartir antes.
-# MAGIC 2. Arregla el skew con *salting*: añade una columna `sal` aleatoria de 0 a 7 y reparte por `park_id` y `sal`.
-# MAGIC 3. Haz la suma de potencia por parque en dos fases con la sal, primero por `park_id` y `sal` y después solo por `park_id`. Comprueba que da lo mismo.
+# MAGIC 2. El skew se arregla con *salting*. A cada fila se le añade un número al azar del 0 al 7, la sal. Así P01 deja de ser una sola clave y pasa a ser ocho (P01 con sal 0, P01 con sal 1...), y cada una puede ir a una partición distinta. La columna se crea con `con_sal = lecturas.withColumn("sal", (F.rand() * 8).cast("int"))`. Reparte `con_sal` por `park_id` y `sal` con `repartition(8, "park_id", "sal")` y compara el reparto con el de solo `park_id`.
+# MAGIC 3. La sal reparte el trabajo, pero el resultado tiene que ser el mismo. Cuenta las lecturas de cada parque de dos formas y compara: directamente con `con_sal.groupBy("park_id").count()`, y en dos pasos, primero `groupBy("park_id", "sal").count()` y después sumando esos recuentos por parque.
 # MAGIC 4. Escribe una Pandas UDF para la zona de viento y compárala en tiempo con la UDF normal. Se declara con `@pandas_udf("string")` y recibe una `pd.Series` entera en lugar de un valor suelto.
 # MAGIC 5. Escribe una función `resumen_particiones(df)` que devuelva en una fila el número de particiones con datos, las filas de la mayor, las de la menor y cuántas veces es mayor una que otra. Úsala para comparar el reparto por parque, el reparto por parque y sal y el `coalesce(2)`.

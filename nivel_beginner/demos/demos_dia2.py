@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Día 2: PySpark y rendimiento básico
+# MAGIC
+# MAGIC Las celdas que solo tienen comentarios se escriben en clase. El resto ya está hecho: se ejecuta y se mira lo que pasa.
 
 # COMMAND ----------
 
@@ -25,37 +27,55 @@ def generar_demo(turbinas, minutos):
             .selectExpr("turbine_id", "park_id", "ts", "stack(2, 'wind_speed', wind_speed, 'power_kw', power_kw) as (signal, value)"))
 
 
-# Telemetría de ejemplo: 60 turbinas, un día, dos señales (unas 173.000 filas)
+# Telemetría de ejemplo: 60 turbinas, un día, dos señales (172.800 filas)
 (generar_demo(df_turbinas().filter("cast(substring(turbine_id, 5) as int) % 4 = 0"), 1440)
     .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(t("demo_telemetria")))
-print(spark.table(t("demo_telemetria")).count(), "filas en demo_telemetria")
 
 # Copia en JSON para la demo de lectura
 RUTA_JSON = f"{RUTA_VOL}/demo_dia2/json"
 spark.table(t("demo_telemetria")).write.mode("overwrite").json(RUTA_JSON)
+
 lect = spark.table(t("demo_telemetria"))
 maestro = df_turbinas().join(df_parques().select("park_id", F.col("nombre").alias("parque")), "park_id")
+print(lect.count(), "filas en lect y", maestro.count(), "turbinas en maestro")
 
 
 def filas_por_particion(df):
+    """Cuántas filas tiene cada partición del DataFrame."""
     return df.groupBy(F.spark_partition_id().alias("particion")).count().orderBy("particion")
+
+
+def cronometrar(nombre, df):
+    """Hace un count de df y dice cuánto ha tardado."""
+    t0 = time.time()
+    df.count()
+    print(f"{nombre}: {time.time() - t0:.1f} s")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Los datos
+# MAGIC `lect` tiene una fila por turbina, minuto y señal (`wind_speed` o `power_kw`). `maestro` tiene una fila por turbina con su parque y su modelo.
+
+# COMMAND ----------
+
+display(lect.limit(10))
+display(maestro.limit(10))
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 1. Leer
+# MAGIC El mismo JSON leído dos veces: dejando que Spark adivine el esquema y dándoselo escrito. Mirad lo que tarda cada celda y qué tipos salen.
 
 # COMMAND ----------
 
-t0 = time.time()
-inferido = spark.read.json(RUTA_JSON)
-inferido.printSchema()
-print(f"esquema inferido: {time.time() - t0:.1f} s")
+# Lee el JSON de RUTA_JSON sin esquema y enseña el esquema con printSchema.
 
-t0 = time.time()
-explicito = spark.read.schema("turbine_id STRING, park_id STRING, ts TIMESTAMP, signal STRING, value DOUBLE").json(RUTA_JSON)
-explicito.printSchema()
-print(f"esquema escrito: {time.time() - t0:.1f} s")
+# COMMAND ----------
+
+# Léelo otra vez con este esquema escrito y enseña el esquema:
+# turbine_id STRING, park_id STRING, ts TIMESTAMP, signal STRING, value DOUBLE
 
 # COMMAND ----------
 
@@ -64,21 +84,30 @@ print(f"esquema escrito: {time.time() - t0:.1f} s")
 
 # COMMAND ----------
 
-display(lect
-        .filter(F.col("signal") == "power_kw")
-        .select("turbine_id", "ts", "value")
-        .withColumn("potencia_mw", F.round(F.col("value") / 1000, 3))
-        .withColumn("estado", F.when(F.col("value") > 3000, "ALTA").when(F.col("value") > 0, "BAJA").otherwise("PARADA"))
-        .limit(10))
+# A partir de lect, paso a paso y ejecutando después de cada línea:
+# 1. Quédate con las lecturas de potencia (signal igual a power_kw).
+# 2. Elige turbine_id, ts y value.
+# 3. Añade potencia_mw: value entre 1000, redondeado a 3 decimales.
+# 4. Añade estado: ALTA por encima de 3000 kW, BAJA por encima de 0 y PARADA en el resto.
+# 5. Enseña 10 filas.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Datos sucios: cuando el sensor falla manda texto, nulos o -9999.
 
 # COMMAND ----------
 
 sucio = spark.createDataFrame([("WTG-0001", "12.5"), ("WTG-0002", "N/A"), ("WTG-0003", None), ("WTG-0004", "-9999")],
                               "turbine_id string, valor string")
-display(sucio
-        .withColumn("como_numero", F.expr("try_cast(valor AS double)"))              # N/A pasa a nulo en vez de fallar
-        .withColumn("sin_centinela", F.when(F.col("como_numero") != -9999, F.col("como_numero")))
-        .withColumn("con_cero", F.coalesce("sin_centinela", F.lit(0.0))))
+display(sucio)
+
+# COMMAND ----------
+
+# Sobre sucio, añade tres columnas, una cada vez:
+# como_numero: valor pasado a double con try_cast (N/A queda en nulo en vez de romper).
+# sin_centinela: como_numero, pero nulo cuando vale -9999.
+# con_cero: sin_centinela con los nulos cambiados por 0.
 
 # COMMAND ----------
 
@@ -87,59 +116,98 @@ display(sucio
 
 # COMMAND ----------
 
-potencia = lect.filter("signal = 'power_kw'")
-display(potencia.groupBy("park_id")
-        .agg(F.round(F.avg("value"), 1).alias("kw_medio"), F.count("*").alias("lecturas"))
-        .orderBy("park_id"))
+# Guarda en potencia las lecturas de power_kw de lect.
+# Saca por parque la potencia media (redondeada a 1 decimal) y el número de lecturas, ordenado por parque.
 
 # COMMAND ----------
 
-display(potencia.join(maestro.select("turbine_id", "parque", "modelo"), "turbine_id")
-        .groupBy("parque", "modelo").agg(F.round(F.avg("value"), 1).alias("kw_medio"))
-        .orderBy("parque", "modelo"))
+# Une potencia con maestro por turbine_id (del maestro solo turbine_id, parque y modelo)
+# y saca la potencia media por parque y modelo, ordenado por los dos.
 
 # COMMAND ----------
 
-# Una lectura de una turbina que no está en el maestro
+# MAGIC %md
+# MAGIC Una lectura de una turbina que no está en el maestro.
+
+# COMMAND ----------
+
 extra = spark.createDataFrame([("WTG-0999", "power_kw", 1500.0)], "turbine_id string, signal string, value double")
-display(extra.join(maestro, "turbine_id", "left_anti"))
+display(extra)
 
 # COMMAND ----------
 
-# Lo mismo en SQL, con vistas temporales
+# Con un join left_anti contra maestro, saca las lecturas de extra cuya turbina no está en el maestro.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Lo mismo en SQL. Una vista temporal deja consultar un DataFrame desde SQL mientras dura la sesión.
+
+# COMMAND ----------
+
 potencia.createOrReplaceTempView("potencia_v")
 maestro.createOrReplaceTempView("maestro_v")
-display(spark.sql("""
-    SELECT m.parque, round(avg(p.value), 1) AS kw_medio
-    FROM potencia_v p JOIN maestro_v m USING (turbine_id)
-    GROUP BY m.parque ORDER BY m.parque"""))
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Potencia media por parque, con el nombre del parque: une potencia_v y maestro_v por turbine_id.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 4. Lazy y planes
+# MAGIC Hay dos tipos de operaciones.
+# MAGIC
+# MAGIC - **Transformaciones**: `filter`, `select`, `withColumn`, `groupBy`, `join`, `orderBy`... Devuelven otro DataFrame y no ejecutan nada. Spark solo apunta lo que hay que hacer.
+# MAGIC - **Acciones**: `count`, `show`, `display`, `collect`, `write`... Piden un resultado. En ese momento Spark junta todas las transformaciones pendientes en un plan, lo optimiza y lo ejecuta.
+# MAGIC
+# MAGIC Por eso una cadena larga de transformaciones tarda cero segundos y todo el tiempo se va en la acción. Y por eso un error en los datos, como el `N/A` de antes con un cast normal, no salta hasta la acción.
 
 # COMMAND ----------
 
-t0 = time.time()
-plan = lect.filter("signal = 'wind_speed'").withColumn("doble", F.col("value") * 2).groupBy("turbine_id").agg(F.max("doble"))
-print(f"transformaciones: {time.time() - t0:.2f} s")      # no ha hecho nada todavía
-t0 = time.time()
+# Tres transformaciones encadenadas. Mirad lo que tarda la celda.
+plan = (lect.filter(F.col("signal") == "wind_speed")
+            .withColumn("doble", F.col("value") * 2)
+            .groupBy("turbine_id").agg(F.max("doble")))
+
+# COMMAND ----------
+
+# Una acción: ahora sí se lee la tabla y se hace todo lo de arriba
 plan.count()
-print(f"acción: {time.time() - t0:.2f} s")                # aquí se hace todo el trabajo
 
 # COMMAND ----------
 
-lect.filter("signal = 'wind_speed'").withColumn("doble", F.col("value") * 2).explain()   # narrow: sin Exchange
+# MAGIC %md
+# MAGIC Las transformaciones también se dividen según si mueven datos o no.
+# MAGIC
+# MAGIC - **Narrow**: cada partición se procesa sola, sin mirar las demás. `filter`, `select`, `withColumn`. Son baratas.
+# MAGIC - **Wide**: necesitan juntar filas que están en particiones distintas, así que Spark las vuelve a repartir entre las máquinas. Eso es el **shuffle**: escribir a disco, mandar por la red y volver a leer. `groupBy`, `join`, `orderBy`, `distinct`, `repartition`.
+# MAGIC
+# MAGIC `explain()` enseña el plan que va a ejecutar Spark. El shuffle aparece como `Exchange` y es lo primero que se busca cuando algo va lento.
 
 # COMMAND ----------
 
-lect.groupBy("turbine_id").count().explain()                                             # wide: con Exchange (shuffle)
+# Narrow: en el plan no hay Exchange
+lect.filter(F.col("signal") == "wind_speed").withColumn("doble", F.col("value") * 2).explain()
+
+# COMMAND ----------
+
+# Wide: groupBy tiene que juntar las filas de cada turbina y aparece un Exchange
+lect.groupBy("turbine_id").count().explain()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 5. Particiones
+# MAGIC Un DataFrame está partido en trozos llamados particiones. Cada partición la procesa una tarea y las tareas van en paralelo. Con pocas particiones se desaprovechan máquinas. Si una es mucho más grande que el resto, todas acaban esperando por ella.
+# MAGIC
+# MAGIC - `repartition(n)` reparte las filas en n particiones parejas. Hace shuffle.
+# MAGIC - `coalesce(n)` junta particiones que ya existen para bajar a n. No hace shuffle y es más barato, pero solo sirve para bajar.
+
+# COMMAND ----------
+
+display(filas_por_particion(lect))                              # como viene de la tabla
 
 # COMMAND ----------
 
@@ -147,49 +215,74 @@ display(filas_por_particion(lect.repartition(8)))               # 8 particiones 
 
 # COMMAND ----------
 
-display(filas_por_particion(lect.repartition(8).coalesce(2)))   # coalesce junta particiones sin repartir de nuevo
+display(filas_por_particion(lect.repartition(8).coalesce(2)))   # junta las 8 en 2 sin volver a repartir
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 6. Skew y broadcast
+# MAGIC Hay skew cuando una clave tiene muchas más filas que las demás. Al repartir por esa clave, en un `groupBy` o en un `join`, todas sus filas van a la misma partición. Esa tarea tarda mucho más y el resto del clúster se queda esperando. Poner más particiones no lo arregla, porque una clave siempre cae entera en una sola.
 
 # COMMAND ----------
 
-grande = (spark.range(3_000_000)
+# Una tabla grande: 10 millones de filas, el 70 % de P01 y el resto repartido entre P02 y P06
+grande = (spark.range(10_000_000)
           .withColumn("park_id", F.when(F.rand(1) < 0.7, "P01")
                       .otherwise(F.concat(F.lit("P0"), (F.rand(2) * 5 + 2).cast("int").cast("string")))))
-display(filas_por_particion(grande.repartition(8, "park_id")))  # una partición se lleva casi todo
+display(grande.groupBy("park_id").count().orderBy("park_id"))
 
 # COMMAND ----------
 
+# Repartida por park_id en 8 particiones: todo P01 cae en la misma
+display(filas_por_particion(grande.repartition(8, "park_id")))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Spark tiene dos formas principales de hacer un join.
+# MAGIC
+# MAGIC - **Sort-merge**: reparte las dos tablas por la clave (shuffle en los dos lados), ordena cada partición y las cruza. Sirve para dos tablas grandes, pero sufre con el skew porque todo P01 va a la misma tarea.
+# MAGIC - **Broadcast**: copia la tabla pequeña entera a cada máquina y cruza ahí cada partición de la grande. La grande no se mueve, así que no hay shuffle ni skew. Solo vale si la pequeña cabe en memoria.
+# MAGIC
+# MAGIC Spark hace broadcast solo cuando ve que una tabla es pequeña. Aquí forzamos cada forma para comparar.
+
+# COMMAND ----------
+
+# Tarifas por parque: 6 filas
 tarifas = spark.createDataFrame([(f"P0{i}", 50.0 + i) for i in range(1, 7)], "park_id string, precio double")
-grande.join(tarifas.hint("merge"), "park_id").explain()         # sort-merge: Exchange en los dos lados
+display(tarifas)
 
 # COMMAND ----------
 
-grande.join(F.broadcast(tarifas), "park_id").explain()           # broadcast: la tabla grande no se mueve
+cronometrar("sort-merge", grande.join(tarifas.hint("merge"), "park_id"))   # hint("merge") obliga a hacer sort-merge
+cronometrar("broadcast ", grande.join(F.broadcast(tarifas), "park_id"))     # broadcast() obliga a copiar tarifas
+
+# COMMAND ----------
+
+# El porqué está en el plan: Exchange en los dos lados contra BroadcastExchange solo en tarifas
+grande.join(tarifas.hint("merge"), "park_id").explain()
+grande.join(F.broadcast(tarifas), "park_id").explain()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 7. UDF o función de Spark
+# MAGIC Una UDF es una función de Python normal que Spark aplica fila a fila. Para eso manda cada fila a un proceso de Python y trae el resultado de vuelta. Las funciones de `F` se ejecutan dentro del motor, sin salir de él, y el optimizador las entiende. Calculamos la misma potencia teórica de las dos formas sobre 2 millones de velocidades de viento.
 
 # COMMAND ----------
 
-import pandas as pd
 from pyspark.sql.functions import udf
+
+K = 0.5 * 1.225 * math.pi * 75 ** 2 * 0.45 / 1000   # kW por (m/s)^3 con un rotor de 150 m
 
 
 def potencia_teorica(v):
-    return 0.0 if v is None or v < 3 or v >= 25 else min(0.5 * 1.225 * math.pi * 75 ** 2 * v ** 3 * 0.45 / 1000, 4200.0)
+    return 0.0 if v < 3 else min(K * v ** 3, 4200.0)
 
 
 con_udf = udf(potencia_teorica, "double")
-nativa = (F.when((F.col("v") < 3) | (F.col("v") >= 25), 0.0)
-           .otherwise(F.least(F.lit(0.5 * 1.225 * math.pi * 75 ** 2 * 0.45 / 1000) * F.pow("v", 3), F.lit(4200.0))))
-datos = spark.range(0, 2_000_000).select((F.rand(1) * 20).alias("v"))
-for nombre, expr in [("UDF", con_udf("v")), ("Funciones de Spark", nativa)]:
-    t0 = time.time()
-    datos.select(expr.alias("p")).agg(F.sum("p")).collect()
-    print(f"{nombre:20s} {time.time() - t0:5.1f} s")
+nativa = F.when(F.col("v") < 3, 0.0).otherwise(F.least(F.lit(K) * F.pow("v", 3), F.lit(4200.0)))
+
+datos = spark.range(2_000_000).select((F.rand(1) * 20).alias("v"))
+cronometrar("UDF               ", datos.select(con_udf("v").alias("p")).filter("p > 1000"))
+cronometrar("Funciones de Spark", datos.select(nativa.alias("p")).filter("p > 1000"))

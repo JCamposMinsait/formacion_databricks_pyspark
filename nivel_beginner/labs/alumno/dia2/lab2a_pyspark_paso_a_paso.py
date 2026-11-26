@@ -216,4 +216,9 @@ display(spark.sql("""
 # MAGIC 2. Las lecturas de turbinas que no están en el maestro, con un `left_anti`.
 # MAGIC 3. El viento medio por hora del día en el parque P03. ¿A qué hora sopla más? La hora se saca con `F.hour("ts")`.
 # MAGIC 4. Un resumen por provincia con la energía producida en MWh, el número de turbinas y la temperatura máxima de la multiplicadora, todo en un solo `agg`. Para quedarte con una señal dentro de una agregación, mete un `F.when` dentro, por ejemplo `F.max(F.when(F.col("signal") == "temp_gearbox_c", F.col("value")))`. La energía es la suma de `power_kw` entre 60, porque cada lectura es un minuto, y entre 1000 para pasar de kWh a MWh.
-# MAGIC 5. ¿Qué turbinas rinden peor que las demás de su modelo? Pasa a una fila por turbina y minuto con una columna por señal con `groupBy("turbine_id", "ts").pivot("signal", ["wind_speed", "power_kw"]).agg(F.avg("value"))`. Quédate con los minutos de viento entre 4 y 8 m/s y divide la potencia entre el viento al cubo, que es como crece la potencia con el viento. Saca la media de cada turbina, compárala con la media de su modelo y ordena. Las que menos rinden deberían ser WTG-0042, WTG-0117 y WTG-0199.
+# MAGIC 5. ¿Qué turbinas producen menos que sus vecinas? Las turbinas del mismo parque y del mismo modelo reciben casi el mismo viento, así que deberían producir parecido. Hazlo en tres pasos:
+# MAGIC    - La potencia media de cada turbina, con su parque y su modelo. Usa solo las lecturas de `power_kw` mayores que 0, para no contar las paradas, y une con el maestro para tener el modelo.
+# MAGIC    - Con ese resultado, la potencia media de cada parque y modelo.
+# MAGIC    - Une los dos por parque y modelo con `join(otro, ["park_id", "modelo"])`, divide la media de la turbina entre la de su grupo y ordena de menor a mayor.
+# MAGIC
+# MAGIC    Abajo deberían quedar WTG-0042, WTG-0117 y WTG-0199, en torno a 0,8.
